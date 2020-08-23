@@ -29,15 +29,15 @@
           "wounds": {
             "value": 0,
             "min": 0,
-            "max": 10
+            "max": 0
           },
           "strain": {
             "value": 0,
             "min": 0,
-            "max": 10
+            "max": 0
           },
           "soak": {
-            "value": 2
+            "value": 0
           },
           "defence": {
             "ranged": 0,
@@ -61,40 +61,34 @@
       "characteristics": {
         "characteristics": {
           "Brawn": {
-            "value": 2,
+            "value": 0,
             "label": "Brawn",
-            "abrev": "Br",
-            "max": 7
+            "abrev": "Br"
           },
           "Agility": {
-            "value": 2,
+            "value": 0,
             "label": "Agility",
-            "abrev": "Ag",
-            "max": 7
+            "abrev": "Ag"
           },
           "Intellect": {
-            "value": 2,
+            "value": 0,
             "label": "Intellect",
-            "abrev": "Int",
-            "max": 7
+            "abrev": "Int"
           },
           "Cunning": {
-            "value": 2,
+            "value": 0,
             "label": "Cunning",
-            "abrev": "Cun",
-            "max": 7
+            "abrev": "Cun"
           },
           "Willpower": {
-            "value": 2,
+            "value": 0,
             "label": "Willpower",
-            "abrev": "Will",
-            "max": 7
+            "abrev": "Will"
           },
           "Presence": {
-            "value": 2,
+            "value": 0,
             "label": "Presence",
-            "abrev": "Pr",
-            "max": 7
+            "abrev": "Pr"
           }
         }
       },
@@ -384,17 +378,10 @@
       },
       "attributes": {
         "attributes": {}
-      },
-      "modifiers": {
-        "modifiers": {
-          "Characteristic": {},
-          "Skill Rank": {},
-          "Stat": {}
-        }
       }
     },
     "character": {
-      "templates": ["biography", "species", "career", "specialisation", "stats", "characteristics", "skills", "attributes", "modifiers"],
+      "templates": ["biography", "species", "career", "specialisation", "stats", "characteristics", "skills", "attributes"],
       "encumbrance": {
         "value": 0,
         "type": "Number",
@@ -427,7 +414,7 @@
       }
     },
     "minion": {
-      "templates": ["biography", "stats", "characteristics", "skills", "attributes", "modifiers"],
+      "templates": ["biography", "stats", "characteristics", "skills", "attributes"],
       "quantity": {
         "value": 1,
         "max": 1,
@@ -529,10 +516,14 @@
     }
   },
   "Item": {
-    "types": ["gear", "weapon", "armour", "talent", "shipweapon", "shipattachment", "criticalinjury", "criticaldamage", "forcepower", "specialization"],
+    "types": [
+      "armour", "career", "criticaldamage", "criticalinjury", "forcepower", "gear", "talent", "shipattachment", "shipweapon", "specialization", "species", "weapon"],
     "templates": {
-      "basic": {
+      "core": {
         "description": "",
+        "attributes": {}
+      },
+      "basic": {
         "quantity": {
           "value": 1,
           "type": "Number",
@@ -554,8 +545,7 @@
           "value": 0,
           "type": "Number",
           "label": "Rarity"
-        },
-        "attributes": {}
+        }
       },
       "hardpoints": {
         "hardpoints": {
@@ -574,10 +564,10 @@
       }
     },
     "gear": {
-      "templates": ["basic"]
+      "templates": ["core", "basic"]
     },
     "weapon": {
-      "templates": ["basic", "hardpoints", "equippable"],
+      "templates": ["core", "basic", "hardpoints", "equippable"],
       "skill": {
         "value": "Ranged: Light",
         "type": "String",
@@ -607,7 +597,7 @@
       }
     },
     "armour": {
-      "templates": ["basic", "hardpoints", "equippable"],
+      "templates": ["core", "basic", "hardpoints", "equippable"],
       "defence": {
         "value": 0,
         "type": "Number",
@@ -621,8 +611,7 @@
       }
     },
     "talent": {
-      "templates": ["basic"],
-      "description": "",
+      "templates": ["core"],
       "activation": {
         "value": "Passive",
         "type": "String",
@@ -634,16 +623,18 @@
         "min": 0
       },
       "isForceTalent": false,
-      "trees": [],
-      "attributes": {}
+      "trees": []
     },
     "shipweapon": {
-      "templates": ["basic", "hardpoints", "equippable"],
+      "templates": ["core", "basic", "hardpoints", "equippable"],
       "label": "Ship Weapon",
       "firingarc": {
-        "value": "Fore",
-        "type": "String",
-        "label": "Skill"
+        "fore": false,
+        "aft": false,
+        "port": false,
+        "starboard": false,
+        "dorsal": false,
+        "ventral": false
       },
       "damage": {
         "value": 0,
@@ -669,59 +660,26 @@
       }
     },
     "shipattachment": {
-      "templates": ["basic", "hardpoints", "equippable"],
+      "templates": ["core", "basic", "hardpoints", "equippable"],
       "label": "Ship Attachment"
     },
     "species": {
-      "description": "",
-      "careerskills": [],
-      "characteristics": {
-        "Brawn": {
-          "value": 2,
-          "label": "Brawn",
-          "abrev": "Br"
-        },
-        "Agility": {
-          "value": 2,
-          "label": "Agility",
-          "abrev": "Ag"
-        },
-        "Intellect": {
-          "value": 2,
-          "label": "Intellect",
-          "abrev": "Int"
-        },
-        "Cunning": {
-          "value": 2,
-          "label": "Cunning",
-          "abrev": "Cun"
-        },
-        "Willpower": {
-          "value": 2,
-          "label": "Willpower",
-          "abrev": "Will"
-        },
-        "Presence": {
-          "value": 2,
-          "label": "Presence",
-          "abrev": "Pr"
-        }
-      }
+      "templates": ["core"]
     },
     "criticalinjury": {
+      "templates": ["core"],
       "min": 0,
       "max": 0,
-      "severity": 1,
-      "description": ""
+      "severity": 1
     },
     "criticaldamage": {
+      "templates": ["core"],
       "min": 0,
       "max": 0,
-      "severity": 1,
-      "description": ""
+      "severity": 1
     },
     "forcepower": {
-      "description": "",
+      "templates": ["core"],
       "upgrades": {
         "upgrade0": {},
         "upgrade1": {},
@@ -739,11 +697,10 @@
         "upgrade13": {},
         "upgrade14": {},
         "upgrade15": {}
-      },
-      "attributes": {}
+      }
     },
     "specialization": {
-      "description": "",
+      "templates": ["core"],
       "talents": {
         "talent0": {},
         "talent1": {},
@@ -765,8 +722,10 @@
         "talent17": {},
         "talent18": {},
         "talent19": {}
-      },
-      "attributes": {}
+      }
+    },
+    "career" : {
+      "templates": ["core"]
     }
   }
 }

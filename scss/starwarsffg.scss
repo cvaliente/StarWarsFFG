@@ -9,8 +9,6 @@
 @import "global/grid";
 @import "global/flex";
 
-
-
 .starwarsffg {
   @import "components/forms";
   @import "components/sheet";
@@ -41,4 +39,8 @@
   @import 'components/specializations';
   @import 'components/dataimporter';
   @import 'components/dicepool';
+  @import 'components/species';
+  @import 'components/career';
 }
+
+@import "components/ogimport";

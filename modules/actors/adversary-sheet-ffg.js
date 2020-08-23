@@ -2,7 +2,12 @@
  * Extend the basic ActorSheet with some very simple modifications
  * @extends {ActorSheet}
  */
+import Helpers from "../helpers/common.js";
 import DiceHelpers from "../helpers/dice-helpers.js";
+import ActorOptions from "./actor-ffg-options.js";
+import ImportHelpers from "../importer/import-helpers.js";
+import ModifierHelpers from "../helpers/modifiers.js";
+import ActorHelpers from "../helpers/actor-helpers.js";
 
 export class AdversarySheetFFG extends ActorSheet {
   constructor(...args) {
@@ -46,19 +51,23 @@ export class AdversarySheetFFG extends ActorSheet {
       attr.isCheckbox = attr.dtype === "Boolean";
     }
     data.FFG = CONFIG.FFG;
+    data.settings = {
+      enableSoakCalculation: game.settings.get("starwarsffg", "enableSoakCalc"),
+    };
 
     switch (this.actor.data.type) {
       case "character":
         this.position.width = 595;
         this.position.height = 783;
-        if(data.limited) {
+        if (data.limited) {
           this.position.height = 165;
-        } 
+        }
 
         // we need to update all specialization talents with the latest talent information
         if (!this.actor.data.flags.loaded) {
           this._updateSpecialization(data);
         }
+
         break;
       case "minion":
         this.position.width = 595;
@@ -90,32 +99,88 @@ export class AdversarySheetFFG extends ActorSheet {
     // Everything below here is only needed if the sheet is editable
     if (!this.options.editable) return;
 
-    // Update Inventory Item - By clicking entire line
-    html.find("table.items .item, .header-description-block .item").click((ev) => {
-      if (!$(ev.target).hasClass("fa-trash") && !$(ev.target).hasClass("fa-times")) {
-        const li = $(ev.currentTarget);
-        const item = this.actor.getOwnedItem(li.data("itemId"));
-        if (item?.sheet) {
-          item.sheet.render(true);
+    Hooks.on("preCreateOwnedItem", (actor, item, options, userid) => {
+      if (item.type === "species" || item.type === "career") {
+        if (actor.data.type === "character") {
+          // we only allow one species and one career, find any other species and remove them.
+          const itemToDelete = actor.items.filter((i) => i.type === item.type);
+          itemToDelete.forEach((i) => {
+            this.actor.deleteOwnedItem(i._id);
+          });
+        } else {
+          return false;
         }
       }
+
+      return true;
     });
-    // Update Talent - By clicking entire line
-    html.find(".talents .item").click((ev) => {
-      if (!$(ev.target).hasClass("fa-trash")) {
+
+    new ContextMenu(html, ".skillsGrid .skill", [
+      {
+        name: game.i18n.localize("SWFFG.SkillChangeCharacteristicContextItem"),
+        icon: '<i class="fas fa-wrench"></i>',
+        callback: (li) => {
+          this._onChangeSkillCharacteristic(li);
+        },
+      },
+      {
+        name: game.i18n.localize("SWFFG.SkillRemoveContextItem"),
+        icon: '<i class="fas fa-times"></i>',
+        callback: (li) => {
+          this._onRemoveSkill(li);
+        },
+      },
+    ]);
+
+    new ContextMenu(html, "div.skillsHeader", [
+      {
+        name: game.i18n.localize("SWFFG.SkillAddContextItem"),
+        icon: '<i class="fas fa-plus-circle"></i>',
+        callback: (li) => {
+          this._onCreateSkill(li);
+        },
+      },
+    ]);
+
+    if (this.actor.data.type === "character") {
+      const options = new ActorOptions(this, html);
+      options.register("enableAutoSoakCalculation", {
+        name: game.i18n.localize("SWFFG.EnableSoakCalc"),
+        hint: game.i18n.localize("SWFFG.EnableSoakCalcHint"),
+        default: true,
+      });
+      options.register("enableForcePool", {
+        name: game.i18n.localize("SWFFG.EnableForcePool"),
+        hint: game.i18n.localize("SWFFG.EnableForcePoolHint"),
+        default: true,
+      });
+    }
+
+    // Toggle item equipped
+    html.find(".items .item a.toggle-equipped").click((ev) => {
+      const li = $(ev.currentTarget);
+      const item = this.actor.getOwnedItem(li.data("itemId"));
+      if (item) {
+        item.update({ ["data.equippable.equipped"]: !item.data.data.equippable.equipped });
+      }
+    });
+
+    // Toggle item details
+    html.find(".items .item, .header-description-block .item, .injuries .item").click(async (ev) => {
+      if (!$(ev.target).hasClass("fa-trash") && !$(ev.target).hasClass("fas") && !$(ev.target).hasClass("rollable")) {
         const li = $(ev.currentTarget);
-        const row = $(li).parents("tr")[0];
-
         let itemId = li.data("itemId");
+        let item = this.actor.getOwnedItem(itemId);
 
-        let item;
-        if (!$(li).closest("tr").hasClass("specialization-talent-item")) {
-          item = this.actor.getOwnedItem(itemId);
-        } else {
+        if (!item) {
           item = game.items.get(itemId);
         }
+        if (!item) {
+          item = await ImportHelpers.findCompendiumEntityById("Item", itemId);
+        }
         if (item?.sheet) {
-          item.sheet.render(true);
+          if (item?.type == "species" || item?.type == "career" || item?.type == "specialization") item.sheet.render(true);
+          else this._itemDisplayDetails(item, ev);
         }
       }
     });
@@ -127,9 +192,70 @@ export class AdversarySheetFFG extends ActorSheet {
       li.slideUp(200, () => this.render(false));
     });
 
+    // Edit Inventory Item
+    html.find(".item-edit").click(async (ev) => {
+      const li = $(ev.currentTarget).parents(".item");
+      let itemId = li.data("itemId");
+      let item = this.actor.getOwnedItem(itemId);
+      if (!item) {
+        item = game.items.get(itemId);
+
+        if (!item) {
+          item = await ImportHelpers.findCompendiumEntityById("Item", itemId);
+        }
+      }
+      if (item?.sheet) {
+        item.sheet.render(true);
+      }
+    });
+
+    html.find(".item-info").click((ev) => {
+      ev.stopPropagation();
+      const li = $(ev.currentTarget).parents(".item");
+      const itemId = li.data("itemId");
+
+      const item = this.actor.data.data.talentList.find((talent) => {
+        return talent.itemId === itemId;
+      });
+
+      const title = `${game.i18n.localize("SWFFG.TalentSource")} ${item.name}`;
+
+      new Dialog(
+        {
+          title: title,
+          content: {
+            source: item.source,
+          },
+          buttons: {
+            done: {
+              icon: '<i class="fas fa-check"></i>',
+              label: game.i18n.localize("SWFFG.ButtonAccept"),
+              callback: (html) => {
+                const talentsToRemove = $(html).find("input[type='checkbox']:checked");
+                CONFIG.logger.debug(`Removing ${talentsToRemove.length} talents`);
+
+                for (let i = 0; i < talentsToRemove.length; i += 1) {
+                  const id = $(talentsToRemove[i]).val();
+                  this.actor.deleteOwnedItem(id);
+                }
+              },
+            },
+            cancel: {
+              icon: '<i class="fas fa-times"></i>',
+              label: game.i18n.localize("SWFFG.Cancel"),
+            },
+          },
+        },
+        {
+          classes: ["dialog", "starwarsffg"],
+          template: "systems/starwarsffg/templates/actors/dialogs/ffg-talent-selector.html",
+        }
+      ).render(true);
+    });
+
     // Setup dice pool image and hide filtered skills
     html.find(".skill").each((_, elem) => {
-      this._addSkillDicePool(elem);
+      DiceHelpers.addSkillDicePool(this, elem);
       const filters = this._filters.skills;
     });
 
@@ -147,8 +273,20 @@ export class AdversarySheetFFG extends ActorSheet {
         await DiceHelpers.rollSkill(this, event, upgradeType);
       });
 
+    // Roll from [ROLL][/ROLL] tag.
+    html.find(".rollSkillDirect").on("click", async (event) => {
+      let data = event.currentTarget.dataset;
+      if (data) {
+        let sheet = this.getData();
+        let skill = sheet.data.skills[data["skill"]];
+        let characteristic = sheet.data.characteristics[skill.characteristic];
+        let difficulty = data["difficulty"];
+        await DiceHelpers.rollSkillDirect(skill, characteristic, difficulty, sheet);
+      }
+    });
+
     // Add or Remove Attribute
-    html.find(".attributes").on("click", ".attribute-control", this._onClickAttributeControl.bind(this));
+    html.find(".attributes").on("click", ".attribute-control", ModifierHelpers.onClickAttributeControl.bind(this));
 
     // transfer items between owned actor objects
     const dragDrop = new DragDrop({
@@ -180,73 +318,129 @@ export class AdversarySheetFFG extends ActorSheet {
         $(a).val("2");
       }
     });
-
-    $("div.skill-characteristic").on("click", (event) => {
-      const a = event.currentTarget;
-      const characteristic = a.dataset.characteristic;
-      const ability = $(a).parents("tr[data-ability]")[0].dataset.ability;
-      new Dialog(
-        {
-          title: `${game.i18n.localize("SWFFG.SkillCharacteristicDialogTitle")} ${ability}`,
-          content: {
-            options: CONFIG.FFG.characteristics,
-            char: characteristic,
-          },
-          buttons: {
-            one: {
-              icon: '<i class="fas fa-check"></i>',
-              label: game.i18n.localize("SWFFG.ButtonAccept"),
-              callback: (html) => {
-                let newCharacteristic = $(html).find("input[type='radio']:checked").val();
-
-                CONFIG.logger.debug(`Updating ${ability} Characteristic from ${characteristic} to ${newCharacteristic}`);
-
-                this.object.update({ [`data.skills.${ability}.characteristic`]: newCharacteristic });
-              },
-            },
-            two: {
-              icon: '<i class="fas fa-times"></i>',
-              label: game.i18n.localize("SWFFG.Cancel"),
-            },
-          },
-        },
-        {
-          classes: ["dialog", "starwarsffg"],
-          template: "systems/starwarsffg/templates/actors/dialogs/ffg-skill-characteristic-selector.html",
-        }
-      ).render(true);
-    });
   }
 
-  /* -------------------------------------------- */
-
   /**
-   * Listen for click events on an attribute control to modify the composition of attributes in the sheet
-   * @param {MouseEvent} event    The originating left click event
+   * Display details of an item.
    * @private
    */
-  async _onClickAttributeControl(event) {
+  _itemDisplayDetails(item, event) {
     event.preventDefault();
-    const a = event.currentTarget;
-    const action = a.dataset.action;
-    const attrs = this.object.data.data.attributes;
-    const form = this.form;
+    let li = $(event.currentTarget),
+      itemDetails = item.getItemDetails();
 
-    // Add new attribute
-    if (action === "create") {
-      const nk = Object.keys(attrs).length + 1;
-      let newKey = document.createElement("div");
-      newKey.innerHTML = `<input type="text" name="data.attributes.attr${nk}.key" value="attr${nk}" style="display:none;"/><select class="attribute-modtype" name="data.attributes.attr${nk}.modtype"><option value="Characteristic">Characteristic</option></select><input class="attribute-value" type="text" name="data.attributes.attr${nk}.value" value="0" data-dtype="Number" placeholder="0"/>`;
-      form.appendChild(newKey);
-      await this._onSubmit(event);
+    // Toggle summary
+    if (li.hasClass("expanded")) {
+      let details = li.children(".item-details");
+      details.slideUp(200, () => details.remove());
+    } else {
+      let div = $(`<div class="item-details">${itemDetails.prettyDesc}</div>`);
+      let props = $(`<div class="item-properties"></div>`);
+      itemDetails.properties.forEach((p) => props.append(`<span class="tag">${p}</span>`));
+      div.append(props);
+      li.append(div.hide());
+      div.slideDown(200);
+    }
+    li.toggleClass("expanded");
+  }
+
+  _onChangeSkillCharacteristic(a) {
+    //const a = event.currentTarget;
+    const characteristic = $(a).data("characteristic");
+    const ability = $(a).data("ability");
+    let label = ability;
+    if (CONFIG.FFG.skills[ability]?.label) {
+      label = CONFIG.FFG.skills[ability].label;
     }
 
-    // Remove existing attribute
-    else if (action === "delete") {
-      const li = a.closest(".attribute");
-      li.parentElement.removeChild(li);
-      await this._onSubmit(event);
-    }
+    new Dialog(
+      {
+        title: `${game.i18n.localize("SWFFG.SkillCharacteristicDialogTitle")} ${game.i18n.localize(label)}`,
+        content: {
+          options: CONFIG.FFG.characteristics,
+          char: characteristic,
+        },
+        buttons: {
+          one: {
+            icon: '<i class="fas fa-check"></i>',
+            label: game.i18n.localize("SWFFG.ButtonAccept"),
+            callback: (html) => {
+              let newCharacteristic = $(html).find("input[type='radio']:checked").val();
+
+              CONFIG.logger.debug(`Updating ${ability} Characteristic from ${characteristic} to ${newCharacteristic}`);
+
+              let updateData;
+              setProperty(updateData, `data.skills.${ability}.characteristic`, newCharacteristic);
+
+              this.object.update(updateData);
+            },
+          },
+          two: {
+            icon: '<i class="fas fa-times"></i>',
+            label: game.i18n.localize("SWFFG.Cancel"),
+          },
+        },
+      },
+      {
+        classes: ["dialog", "starwarsffg"],
+        template: "systems/starwarsffg/templates/actors/dialogs/ffg-skill-characteristic-selector.html",
+      }
+    ).render(true);
+  }
+
+  _onCreateSkill(a) {
+    const group = $(a).parent().data("type");
+
+    new Dialog(
+      {
+        title: `${game.i18n.localize("SWFFG.SkillAddDialogTitle")}`,
+        content: {
+          options: CONFIG.FFG.characteristics,
+        },
+        buttons: {
+          one: {
+            icon: '<i class="fas fa-check"></i>',
+            label: game.i18n.localize("SWFFG.ButtonAccept"),
+            callback: (html) => {
+              const name = $(html).find("input[name='name']").val();
+              const characteristic = $(html).find("select[name='characteristic']").val();
+
+              let newSkill = {
+                careerskill: false,
+                characteristic,
+                groupskill: false,
+                label: name,
+                max: 6,
+                rank: 0,
+                type: group,
+                custom: true,
+              };
+
+              if (name.trim().length > 0) {
+                CONFIG.logger.debug(`Creating new skill ${name} (${characteristic})`);
+                let updateData;
+                setProperty(updateData, `data.skills.${name}`, newSkill);
+
+                this.object.update(updateData);
+              }
+            },
+          },
+          two: {
+            icon: '<i class="fas fa-times"></i>',
+            label: game.i18n.localize("SWFFG.Cancel"),
+          },
+        },
+      },
+      {
+        classes: ["dialog", "starwarsffg"],
+        template: "systems/starwarsffg/templates/actors/dialogs/ffg-skill-new.html",
+      }
+    ).render(true);
+  }
+
+  _onRemoveSkill(a) {
+    const ability = $(a).data("ability");
+    this.object.update({ "data.skills": { ["-=" + ability]: null } });
   }
 
   /**
@@ -263,57 +457,12 @@ export class AdversarySheetFFG extends ActorSheet {
     filters.filter = filter;
     await this._onSubmit(event);
   }
-
   /* -------------------------------------------- */
 
   /** @override */
   _updateObject(event, formData) {
-    // Handle the free-form attributes list
-    const formAttrs = expandObject(formData)?.data?.attributes || {};
-    const attributes = Object.values(formAttrs).reduce((obj, v) => {
-      let k = v["key"].trim();
-      if (/[\s\.]/.test(k)) return ui.notifications.error("Attribute keys may not contain spaces or periods");
-      delete v["key"];
-      obj[k] = v;
-      return obj;
-    }, {});
-
-    // Remove attributes which are no longer used
-    if (this.object.data?.data?.attributes) {
-      for (let k of Object.keys(this.object.data.data.attributes)) {
-        if (!attributes.hasOwnProperty(k)) attributes[`-=${k}`] = null;
-      }
-    }
-
-    // Re-combine formData
-    formData = Object.entries(formData)
-      .filter((e) => !e[0].startsWith("data.attributes"))
-      .reduce(
-        (obj, e) => {
-          obj[e[0]] = e[1];
-          return obj;
-        },
-        { _id: this.object._id, "data.attributes": attributes }
-      );
-
-    // Update the Actor
-    this.actor.data.flags.loaded = false;
-    return this.object.update(formData);
-  }
-  
-  _addSkillDicePool(elem) {
-    const data = this.getData();
-    const skillName = elem.dataset["ability"];
-    const skill = data.data.skills[skillName];
-    const characteristic = data.data.characteristics[skill.characteristic];
-
-    const dicePool = new DicePoolFFG({
-      ability: Math.max(characteristic.value, skill.rank),
-    });
-    dicePool.upgrade(Math.min(characteristic.value, skill.rank));
-
-    const rollButton = elem.querySelector(".roll-button");
-    dicePool.renderPreview(rollButton);
+    const actorUpdate = ActorHelpers.updateActor.bind(this);
+    actorUpdate(event, formData);
   }
 
   /**
@@ -378,7 +527,6 @@ export class AdversarySheetFFG extends ActorSheet {
     }
   }
 
-
   async _updateSpecialization(data) {
     CONFIG.logger.debug(`Running Actor initial load`);
     this.actor.data.flags.loaded = true;
@@ -391,11 +539,11 @@ export class AdversarySheetFFG extends ActorSheet {
       const specializationTalents = spec.data.talents;
       for (let talent in specializationTalents) {
         let gameItem;
-        if(specializationTalents[talent].pack && specializationTalents[talent].pack && specializationTalents[talent].pack.length > 0) {
+        if (specializationTalents[talent].pack && specializationTalents[talent].pack.length > 0) {
           const pack = await game.packs.get(specializationTalents[talent].pack);
           await pack.getIndex();
-          const entry = await pack.index.find(e => e._id === specializationTalents[talent].itemId);
-          gameItem = await pack.getEntity(entry._id)
+          const entry = await pack.index.find((e) => e._id === specializationTalents[talent].itemId);
+          gameItem = await pack.getEntity(entry._id);
         } else {
           gameItem = game.items.get(specializationTalents[talent].itemId);
         }
@@ -434,12 +582,13 @@ export class AdversarySheetFFG extends ActorSheet {
   }
 
   _updateSpecializationTalentReference(specializationTalentItem, talentItem) {
-    CONFIG.logger.debug(`Updating Specializations Talent`);
+    CONFIG.logger.debug(`Starwars FFG - Updating Specializations Talent`);
     specializationTalentItem.name = talentItem.name;
     specializationTalentItem.description = talentItem.data.description;
     specializationTalentItem.activation = talentItem.data.activation.value;
     specializationTalentItem.activationLabel = talentItem.data.activation.label;
     specializationTalentItem.isRanked = talentItem.data.ranks.ranked;
     specializationTalentItem.isForceTalent = talentItem.data.isForceTalent;
+    specializationTalentItem.attributes = talentItem.data.attributes;
   }
 }

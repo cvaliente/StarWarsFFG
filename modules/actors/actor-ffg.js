@@ -1,4 +1,5 @@
 import PopoutEditor from "../popout-editor.js";
+import ModifierHelpers from "../helpers/modifiers.js";
 
 /**
  * Extend the base Actor entity.
@@ -8,8 +9,7 @@ export class ActorFFG extends Actor {
   /**
    * Augment the basic actor data with additional dynamic data.
    */
-  prepareData() {
-    super.prepareData();
+  prepareDerivedData() {
     CONFIG.logger.debug(`Preparing Actor Data ${this.data.type}`);
     const actorData = this.data;
     const data = actorData.data;
@@ -17,32 +17,79 @@ export class ActorFFG extends Actor {
 
     // Make separate methods for each Actor type (character, minion, etc.) to keep
     // things organized.
+
+    // if the actor has skills, add custom skills and sort by abbreviation
+    if (data.skills) {
+      const actorSkills = {};
+      Object.keys(data.skills)
+        .filter((skill) => {
+          return data.skills[skill].custom;
+        })
+        .forEach((skill) => {
+          actorSkills[skill] = {
+            value: skill,
+            abrev: data.skills[skill].label,
+            label: data.skills[skill].label,
+            custom: data.skills[skill].custom,
+          };
+        });
+
+      const skills = JSON.parse(JSON.stringify(CONFIG.FFG.skills));
+      mergeObject(skills, actorSkills);
+
+      const sorted = Object.keys(skills).sort(function (a, b) {
+        const x = game.i18n.localize(skills[a].abrev);
+        const y = game.i18n.localize(skills[b].abrev);
+
+        return x < y ? -1 : x > y ? 1 : 0;
+      });
+
+      let ordered = {};
+      sorted.forEach((skill) => {
+        ordered[skill] = skills[skill];
+      });
+
+      CONFIG.FFG.skills = ordered;
+    }
+
+    this._prepareSharedData(actorData);
     if (actorData.type === "minion") this._prepareMinionData(actorData);
     if (actorData.type === "character") this._prepareCharacterData(actorData);
   }
 
   _prepareSharedData(actorData) {
     const data = actorData.data;
+    data.biography = PopoutEditor.replaceRollTags(data.biography, actorData);
+    data.biography = PopoutEditor.renderDiceImages(data.biography);
 
     // localize characteristic names
-    for (let characteristic of Object.keys(data.characteristics)) {
-      const strId = `SWFFG.Characteristic${this._capitalize(characteristic)}`;
-      const localizedField = game.i18n.localize(strId);
+    if (actorData.type !== "vehicle") {
+      for (let characteristic of Object.keys(data.characteristics)) {
+        const strId = `SWFFG.Characteristic${this._capitalize(characteristic)}`;
+        const localizedField = game.i18n.localize(strId);
 
-      data.characteristics[characteristic].label = localizedField;
+        data.characteristics[characteristic].label = localizedField;
+      }
+
+      //localize skill names
+      for (let skill of Object.keys(data.skills)) {
+        const cleanedSkillName = skill.replace(/[\W_]+/g, "");
+
+        const strId = `SWFFG.SkillsName${cleanedSkillName}`;
+        const localizedField = game.i18n.localize(strId);
+
+        if (!data.skills[skill].custom) {
+          data.skills[skill].label = localizedField;
+        }
+        data.skills = this._sortSkills(data.skills);
+      }
     }
 
-    //localize skill names
-    for (let skill of Object.keys(data.skills)) {
-      const cleanedSkillName = skill.replace(/[\W_]+/g, "");
-
-      const strId = `SWFFG.SkillsName${cleanedSkillName}`;
-      const localizedField = game.i18n.localize(strId);
-
-      if(!data.skills[skill].custom) { 
-        data.skills[skill].label = localizedField;
+    if (actorData.type === "minion" || actorData.type === "character") {
+      this._applyModifiers(actorData);
+      if (game.settings.get("starwarsffg", "enableSoakCalc")) {
+        this._calculateDerivedValues(actorData);
       }
-      data.skills = this._sortSkills(data.skills);
     }
   }
 
@@ -50,8 +97,6 @@ export class ActorFFG extends Actor {
    * Prepare Minion type specific data
    */
   _prepareMinionData(actorData) {
-    this._prepareSharedData(actorData);
-
     const data = actorData.data;
 
     // Set Wounds threshold to unit_wounds * quantity to account for minion group health.
@@ -74,7 +119,7 @@ export class ActorFFG extends Actor {
           skill.rank = 0;
         }
       } else if (!skill.groupskill) {
-        skill.rank = 0;
+        skill.rank = data.attributes[key].value;
       }
     }
   }
@@ -83,13 +128,7 @@ export class ActorFFG extends Actor {
    * Prepare Character type specific data
    */
   _prepareCharacterData(actorData) {
-    this._prepareSharedData(actorData);
-
     const data = actorData.data;
-
-    if (game.settings.get("starwarsffg", "enableSoakCalc")) {
-      this._calculateDerivedValues(actorData);
-    }
 
     // Build complete talent list.
 
@@ -99,15 +138,14 @@ export class ActorFFG extends Actor {
 
     const globalTalentList = [];
     specializations.forEach((element) => {
-
       //go throut each list of talent where learned = true
 
-      const learnedTalents = Object.keys(element.data.talents).filter(key => element.data.talents[key].islearned === true);
+      const learnedTalents = Object.keys(element.data.talents).filter((key) => element.data.talents[key].islearned === true);
 
-      learnedTalents.forEach(talent => {
+      learnedTalents.forEach((talent) => {
         const item = JSON.parse(JSON.stringify(element.data.talents[talent]));
         item.firstSpecialization = element._id;
-        item.source = [{ type : "specialization", typeLabel: "SWFFG.Specialization", name: element.name, id: element._id }];
+        item.source = [{ type: "specialization", typeLabel: "SWFFG.Specialization", name: element.name, id: element._id }];
         item.safe_desc = PopoutEditor.renderDiceImages(item.description.replace(/(<([^>]+)>)/gi, ""));
         if (item.isRanked) {
           item.rank = element.data.talents[talent]?.rank ? element.data.talents[talent].rank : 1;
@@ -122,37 +160,10 @@ export class ActorFFG extends Actor {
         if (index < 0 || !item.isRanked) {
           globalTalentList.push(item);
         } else {
-          globalTalentList[index].source.push({ type : "specialization", typeLabel: "SWFFG.Specialization", name: element.name, id: element._id })
+          globalTalentList[index].source.push({ type: "specialization", typeLabel: "SWFFG.Specialization", name: element.name, id: element._id });
           globalTalentList[index].rank += element.data.talents[talent]?.rank ? element.data.talents[talent].rank : 1;
         }
       });
-
-      // if (element?.talentList && element.talentList.length > 0) {
-      //   element.talentList.forEach((talent) => {
-      //     const item = JSON.parse(JSON.stringify(talent));
-      //     item.firstSpecialization = element._id;
-      //     item.source = [{ type : "specialization", typeLabel: "SWFFG.Specialization", name: element.name, id: element._id }];
-      //     item.safe_desc = PopoutEditor.renderDiceImages(talent.description.replace(/(<([^>]+)>)/gi, ""));
-          
-
-      //     if (item.isRanked) {
-      //       item.rank = talent.rank;
-      //     } else {
-      //       item.rank = "N/A";
-      //     }
-
-      //     let index = globalTalentList.findIndex((obj) => {
-      //       return obj.name === item.name;
-      //     });
-
-      //     if (index < 0 || !item.isRanked) {
-      //       globalTalentList.push(item);
-      //     } else {
-      //       globalTalentList[index].source.push({ type : "specialization", typeLabel: "SWFFG.Specialization", name: element.name, id: element._id })
-      //       globalTalentList[index].rank += talent.rank;
-      //     }
-      //   });
-      // }
     });
 
     const talents = actorData.items.filter((item) => {
@@ -161,17 +172,17 @@ export class ActorFFG extends Actor {
 
     talents.forEach((element) => {
       const item = {
-        name : element.name,
-        itemId : element._id,
-        description : element.data.description,
+        name: element.name,
+        itemId: element._id,
+        description: element.data.description,
         activation: element.data.activation.value,
         activationLabel: element.data.activation.label,
         isRanked: element.data.ranks.ranked,
         safe_desc: PopoutEditor.renderDiceImages(element.data.description.replace(/(<([^>]+)>)/gi, "")),
-        source : [{ type : "talent", typeLabel: "SWFFG.Talent", name: element.name, id: element._id }]
-      }
+        source: [{ type: "talent", typeLabel: "SWFFG.Talent", name: element.name, id: element._id }],
+      };
 
-      if(item.isRanked) {
+      if (item.isRanked) {
         item.rank = element.data.ranks.current;
       } else {
         item.rank = "N/A";
@@ -184,10 +195,9 @@ export class ActorFFG extends Actor {
       if (index < 0 || !item.isRanked) {
         globalTalentList.push(item);
       } else {
-        globalTalentList[index].source.push({ type : "talent", typeLabel: "SWFFG.Talent", name: element.name, id: element._id })
+        globalTalentList[index].source.push({ type: "talent", typeLabel: "SWFFG.Talent", name: element.name, id: element._id });
         globalTalentList[index].rank += element.data.ranks.current;
       }
-
     });
 
     globalTalentList.sort((a, b) => {
@@ -200,38 +210,17 @@ export class ActorFFG extends Actor {
       return comparison;
     });
 
-
     data.talentList = globalTalentList;
   }
 
   _calculateDerivedValues(actorData) {
     const data = actorData.data;
     const items = actorData.items;
-    var soak = 0;
-    var armoursoak = 0;
-    var othersoak = 0;
     var encum = 0;
-    var defence = 0;
-    // Calculate soak based on Brawn value, and any Soak modifiers in weapons, armour, gear and talents.
-    // Start with Brawn. Also calculate total encumbrance from items.
-    soak = +data.characteristics.Brawn.value;
 
     // Loop through all items
     for (let [key, item] of Object.entries(items)) {
       try {
-        // For armour type, get all Soak values and add to armoursoak.
-        if (item.type === "armour" && item?.data?.equippable?.equipped) {
-          armoursoak += +item.data.soak.value;
-          defence = Math.max(defence, item.data.defence.value)
-        }
-        // Loop through all item attributes and add any modifiers to our collection.
-        for (let mod in item.data.attributes) {
-          if (mod.mod == "Soak") {
-            othersoak += +mod.value;
-          }
-          
-        }
-
         // Calculate encumbrance, only if encumbrance value exists
         if (item.data?.encumbrance?.value) {
           if (item.type === "armour" && !item?.data?.equippable?.equipped) {
@@ -247,17 +236,6 @@ export class ActorFFG extends Actor {
 
     // Set Encumbrance value on character.
     data.stats.encumbrance.value = encum;
-
-    // Add together all of our soak results.
-    soak += +armoursoak;
-    soak += +othersoak;
-
-    // Finally set Soak value on character.
-    data.stats.soak.value = soak;
-
-    // Set defence value of equipped items.
-    data.stats.defence.ranged = defence;
-    data.stats.defence.melee = defence;
   }
 
   /**
@@ -343,5 +321,162 @@ export class ActorFFG extends Actor {
     });
     skills = skillobject;
     return skills;
+  }
+
+  /**
+   * Prepares the modifier data in the attributes object
+   *
+   * @param  {object} actorData
+   * @param  {object} properties
+   * @param  {string} name
+   * @param  {string} modifierType
+   */
+  _setModifiers(actorData, properties, name, modifierType) {
+    const data = actorData.data;
+    const attributes = Object.keys(data.attributes)
+      .filter((key) =>
+        Object.keys(properties)
+          .map((item) => item.toLowerCase())
+          .includes(key.toLowerCase())
+      )
+      .map((key) => Object.assign(data.attributes[key], { key }));
+
+    actorData.modifiers[name] = Object.keys(properties).map((k) => {
+      let key;
+      if (name === "skills") {
+        key = k;
+      } else {
+        key = properties[k].value;
+      }
+
+      let attr = attributes.find((item) => item.key === key);
+
+      if (!attr) {
+        let value = 0;
+
+        if (data[name][k]?.max && name !== "characteristics" && name !== "skills") {
+          value = data[name][k].max;
+        } else if (key === "Defence-Melee") {
+          value = data.stats.defence.melee;
+        } else if (key === "Defence-Ranged") {
+          value = data.stats.defence.ranged;
+        } else if (name === "skills") {
+          value = data[name][k].rank;
+        } else {
+          value = data[name][k].value;
+        }
+
+        // the expected attrbute for the characteristic doesn't exist, this is an older or new character, we need to migrate the current value to an attribute
+        data.attributes[`${key}`] = {
+          modtype: modifierType,
+          mod: key,
+          value,
+        };
+        attr = {
+          key: `${key}`,
+          value,
+        };
+      } else {
+        data.attributes[`${key}`].modtype = modifierType;
+        data.attributes[`${key}`].mod = key;
+        data.attributes[`${key}`].value = attr.value;
+      }
+
+      return {
+        key,
+        value: attr?.value ? parseInt(attr.value, 10) : 0,
+        modtype: modifierType,
+        mod: key,
+      };
+    });
+  }
+
+  /**
+   * Applies the modifers from all attributes on all associated items for an actor
+   *
+   * @param  {object} actorData
+   */
+  _applyModifiers(actorData) {
+    const data = actorData.data;
+    const isPC = this.isPC;
+    if (!actorData.modifiers) {
+      actorData.modifiers = {};
+    }
+
+    /* Characteristics */
+    this._setModifiers(actorData, CONFIG.FFG.characteristics, "characteristics", "Characteristic");
+    Object.keys(CONFIG.FFG.characteristics).forEach((key) => {
+      let total = 0;
+      total += data.attributes[key].value;
+      total += ModifierHelpers.getCalculatedValueFromItems(actorData.items, key, "Characteristic");
+      data.characteristics[key].value = total > 7 ? 7 : total;
+    });
+
+    /* Stats */
+    this._setModifiers(actorData, CONFIG.FFG.character_stats, "stats", "Stat");
+    Object.keys(CONFIG.FFG.character_stats).forEach((k) => {
+      const key = CONFIG.FFG.character_stats[k].value;
+
+      let total = 0;
+
+      if (key === "Soak") {
+        total = data.characteristics.Brawn.value;
+      }
+      if (key === "Wounds") {
+        if (data.attributes.Wounds.value === 0) {
+          total = data.attributes.Brawn.value + ModifierHelpers.getBaseValue(actorData.items, "Brawn", "Characteristic");
+        }
+      }
+      if (key === "Strain") {
+        if (data.attributes.Strain.value === 0) {
+          total = data.attributes.Willpower.value + ModifierHelpers.getBaseValue(actorData.items, "Willpower", "Characteristic");
+        }
+      }
+
+      total += data.attributes[key].value;
+      total += ModifierHelpers.getCalculatedValueFromItems(actorData.items, key, "Stat");
+
+      if (key === "Soak") {
+        data.stats[k].value = total;
+      } else if (key === "Defence-Melee") {
+        data.stats.defence.melee = total;
+      } else if (key === "Defence-Ranged") {
+        data.stats.defence.ranged = total;
+      } else {
+        data.stats[k].max = total;
+      }
+    });
+
+    /* Skill Rank */
+    this._setModifiers(actorData, data.skills, "skills", "Skill Rank");
+    Object.keys(data.skills).forEach((key) => {
+      let total = 0;
+      total += data.attributes[key].value;
+      total += ModifierHelpers.getCalculatedValueFromItems(actorData.items, key, "Skill Rank");
+
+      /* Career Skills */
+      if (!data.skills[key].careerskill) {
+        data.skills[key].careerskill = ModifierHelpers.getCalculatedValueFromItems(actorData.items, key, "Career Skill");
+      }
+
+      data.skills[key].boost = ModifierHelpers.getCalculatedValueFromItems(actorData.items, key, "Skill Boost");
+      const setback = ModifierHelpers.getCalculatedValueFromItems(actorData.items, key, "Skill Setback");
+      const remsetback = ModifierHelpers.getCalculatedValueFromItems(actorData.items, key, "Skill Remove Setback");
+      data.skills[key].force = ModifierHelpers.getCalculatedValueFromItems(actorData.items, key, "Force Boost") > 0 ? data.stats.forcePool.max : 0;
+
+      if (remsetback >= setback) {
+        data.skills[key].setback = 0;
+        data.skills[key].remsetback = remsetback - setback;
+      } else {
+        data.skills[key].setback = setback - remsetback;
+        data.skills[key].remsetback = 0;
+      }
+
+      if (isPC) {
+        data.skills[key].rank = total > 6 ? 6 : total;
+      } else {
+        data.skills[key].rank = total;
+      }
+    });
   }
 }

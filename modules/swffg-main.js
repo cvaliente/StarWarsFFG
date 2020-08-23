@@ -12,13 +12,19 @@ import { ItemFFG } from "./items/item-ffg.js";
 import { ItemSheetFFG } from "./items/item-sheet-ffg.js";
 import { ActorSheetFFG } from "./actors/actor-sheet-ffg.js";
 import { AdversarySheetFFG } from "./actors/adversary-sheet-ffg.js";
-import { DicePoolFFG } from "./dice-pool-ffg.js";
+import { DicePoolFFG, RollFFG } from "./dice-pool-ffg.js";
 import { GroupManagerLayer } from "./groupmanager-ffg.js";
 import { GroupManager } from "./groupmanager-ffg.js";
 import PopoutEditor from "./popout-editor.js";
 import DataImporter from "./importer/data-importer.js";
 import DiceHelpers from "./helpers/dice-helpers.js";
 import Helpers from "./helpers/common.js";
+import TemplateHelpers from "./helpers/partial-templates.js";
+
+// Import Dice Types
+import { AbilityDie, BoostDie, ChallengeDie, DifficultyDie, ForceDie, ProficiencyDie, SetbackDie } from "./dice-pool-ffg.js";
+import ImportHelpers from "./importer/import-helpers.js";
+import { createFFGMacro } from "./helpers/macros.js";
 
 /* -------------------------------------------- */
 /*  Foundry VTT Initialization                  */
@@ -32,18 +38,14 @@ Hooks.once("init", async function () {
     ActorFFG,
     ItemFFG,
     CombatFFG,
+    RollFFG,
+    DiceHelpers,
     addons: {
       PopoutEditor,
     },
+    diceterms: [AbilityDie, BoostDie, ChallengeDie, DifficultyDie, ForceDie, ProficiencyDie, SetbackDie],
   };
 
-  // Check required module is active and store result to game.requirements_installed
-  const moduletest = game.data.modules.reduce(function (arr, mod, index) {
-    return { ...arr, [mod.id]: mod };
-  }, {});
-  game.requirements_installed = moduletest["special-dice-roller"].active;
-
-  game.ffg.StarWars = game.specialDiceRoller.starWars.parsers[0];
   game.ffg.DestinyPool = {
     "Light": 0,
     "Dark": 0,
@@ -58,6 +60,25 @@ Hooks.once("init", async function () {
   CONFIG.Actor.entityClass = ActorFFG;
   CONFIG.Item.entityClass = ItemFFG;
   CONFIG.Combat.entityClass = CombatFFG;
+
+  // Define custom Roll class
+  CONFIG.Dice.rolls.push(CONFIG.Dice.rolls[0]);
+  CONFIG.Dice.rolls[0] = RollFFG;
+
+  // Define DiceTerms
+  CONFIG.Dice.terms["a"] = AbilityDie;
+  CONFIG.Dice.terms["b"] = BoostDie;
+  CONFIG.Dice.terms["c"] = ChallengeDie;
+  CONFIG.Dice.terms["d"] = DifficultyDie;
+  CONFIG.Dice.terms["f"] = ForceDie;
+  CONFIG.Dice.terms["p"] = ProficiencyDie;
+  CONFIG.Dice.terms["s"] = SetbackDie;
+
+  // Give global access to FFG config.
+  CONFIG.FFG = FFG;
+
+  // TURN ON OR OFF HOOK DEBUGGING
+  CONFIG.debug.hooks = false;
 
   // Override the default Token _drawBar function to allow for FFG style wound and strain values.
   Token.prototype._drawBar = function (number, bar, data) {
@@ -90,62 +111,35 @@ Hooks.once("init", async function () {
   /** @override */
   Combat.prototype._getInitiativeRoll = function (combatant, formula) {
     const cData = combatant.actor.data.data;
-    const origFormula = formula;
 
     if (combatant.actor.data.type === "vehicle") {
-      return new Roll("0");
+      return new RollFFG("0");
     }
 
     if (formula === "Vigilance") {
-      formula = _getInitiativeFormula(cData.skills.Vigilance.rank, cData.characteristics.Willpower.value, 0);
+      formula = _getInitiativeFormula(cData.skills.Vigilance.rank, cData.characteristics.Willpower.value);
     } else if (formula === "Cool") {
-      formula = _getInitiativeFormula(cData.skills.Cool.rank, cData.characteristics.Presence.value, 0);
+      formula = _getInitiativeFormula(cData.skills.Cool.rank, cData.characteristics.Presence.value);
     }
 
     const rollData = combatant.actor ? combatant.actor.getRollData() : {};
-    const letters = formula.split("");
-    const rolls = [];
-    const getSuc = new RegExp("Successes: ([0-9]+)", "g");
-    const getAdv = new RegExp("Advantages: ([0-9]+)", "g");
 
-    for (const letter of letters) {
-      rolls.push(game.ffg.StarWars.letterToRolls(letter, 1));
-    }
+    let roll = new RollFFG(formula, rollData).roll();
 
-    let newformula = combineAll(rolls, game.ffg.StarWars.rollValuesMonoid);
-
-    let rolling = game.specialDiceRoller.starWars.roll(newformula);
-
-    let results = game.specialDiceRoller.starWars.formatRolls(rolling);
-
-    let success = 0;
-    let advantage = 0;
-
-    success = getSuc.exec(results);
-    if (success) {
-      success = success[1];
-    }
-    advantage = getAdv.exec(results);
-    if (advantage) {
-      advantage = advantage[1];
-    }
-
-    let total = +success + advantage * 0.01;
-
-    CONFIG.logger.log(`Total is: ${total}`);
-
-    let roll = new Roll(`0d6 ${origFormula}`, rollData).roll();
+    const total = roll.ffg.success + roll.ffg.advantage * 0.01;
     roll._result = total;
     roll._total = total;
 
     return roll;
   };
 
-  // TURN ON OR OFF HOOK DEBUGGING
-  CONFIG.debug.hooks = false;
-
-  // Give global access to FFG config.
-  CONFIG.FFG = FFG;
+  function _getInitiativeFormula(skill, ability) {
+    const dicePool = new DicePoolFFG({
+      ability: ability,
+    });
+    dicePool.upgrade(skill);
+    return dicePool.renderDiceExpression();
+  }
 
   /**
    * Set an initiative formula for the system
@@ -189,6 +183,21 @@ Hooks.once("init", async function () {
       }
     }
   }
+
+  // Register dice theme setting
+  game.settings.register("starwarsffg", "dicetheme", {
+    name: game.i18n.localize("SWFFG.SettingsDiceTheme"),
+    hint: game.i18n.localize("SWFFG.SettingsDiceThemeHint"),
+    scope: "world",
+    config: true,
+    default: "starwars",
+    type: String,
+    onChange: (rule) => window.location.reload(),
+    choices: {
+      starwars: "starwars",
+      genesys: "genesys",
+    },
+  });
 
   game.settings.register("starwarsffg", "enableSoakCalc", {
     name: game.i18n.localize("SWFFG.EnableSoakCalc"),
@@ -288,18 +297,102 @@ Hooks.once("init", async function () {
     onChange: (rule) => window.location.reload(),
   });
 
-  function combineAll(values, monoid) {
-    return values.reduce((prev, curr) => monoid.combine(prev, curr), monoid.identity);
-  }
+  // Set up dice with dynamic dice theme
+  const dicetheme = game.settings.get("starwarsffg", "dicetheme");
 
-  function _getInitiativeFormula(skill, ability, difficulty) {
-    const dicePool = new DicePoolFFG({
-      ability: ability,
-      difficulty: difficulty,
-    });
-    dicePool.upgrade(skill);
-    return dicePool.renderDiceExpression();
-  }
+  CONFIG.FFG.PROFICIENCY_ICON = `systems/starwarsffg/images/dice/${dicetheme}/yellow.png`;
+  CONFIG.FFG.ABILITY_ICON = `systems/starwarsffg/images/dice/${dicetheme}/green.png`;
+  CONFIG.FFG.CHALLENGE_ICON = `systems/starwarsffg/images/dice/${dicetheme}/red.png`;
+  CONFIG.FFG.DIFFICULTY_ICON = `systems/starwarsffg/images/dice/${dicetheme}/purple.png`;
+  CONFIG.FFG.BOOST_ICON = `systems/starwarsffg/images/dice/${dicetheme}/blue.png`;
+  CONFIG.FFG.SETBACK_ICON = `systems/starwarsffg/images/dice/${dicetheme}/black.png`;
+  CONFIG.FFG.REMOVESETBACK_ICON = `systems/starwarsffg/images/dice/${dicetheme}/black-minus.png`;
+  CONFIG.FFG.FORCE_ICON = `systems/starwarsffg/images/dice/${dicetheme}/whiteHex.png`;
+
+  CONFIG.FFG.ABILITY_RESULTS = {
+    1: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/green.png'/>`, success: 0, failure: 0, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    2: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/greens.png'/>`, success: 1, failure: 0, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    3: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/greens.png'/>`, success: 1, failure: 0, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    4: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/greenss.png'/>`, success: 2, failure: 0, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    5: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/greena.png'/>`, success: 0, failure: 0, advantage: 1, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    6: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/greena.png'/>`, success: 0, failure: 0, advantage: 1, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    7: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/greensa.png'/>`, success: 1, failure: 0, advantage: 1, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    8: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/greenaa.png'/>`, success: 0, failure: 0, advantage: 2, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+  };
+
+  CONFIG.FFG.BOOST_RESULTS = {
+    1: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/blue.png'/>`, success: 0, failure: 0, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    2: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/blue.png'/>`, success: 0, failure: 0, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    3: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/blues.png'/>`, success: 1, failure: 0, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    4: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/bluesa.png'/>`, success: 1, failure: 0, advantage: 1, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    5: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/blueaa.png'/>`, success: 0, failure: 0, advantage: 2, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    6: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/bluea.png'/>`, success: 0, failure: 0, advantage: 1, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+  };
+
+  CONFIG.FFG.CHALLENGE_RESULTS = {
+    1: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/red.png'/>`, success: 0, failure: 0, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    2: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/redf.png'/>`, success: 0, failure: 1, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    3: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/redf.png'/>`, success: 0, failure: 1, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    4: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/redff.png'/>`, success: 0, failure: 2, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    5: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/redff.png'/>`, success: 0, failure: 2, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    6: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/redt.png'/>`, success: 0, failure: 0, advantage: 0, threat: 1, triumph: 0, despair: 0, light: 0, dark: 0 },
+    7: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/redt.png'/>`, success: 0, failure: 0, advantage: 0, threat: 1, triumph: 0, despair: 0, light: 0, dark: 0 },
+    8: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/redft.png'/>`, success: 0, failure: 1, advantage: 0, threat: 1, triumph: 0, despair: 0, light: 0, dark: 0 },
+    9: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/redft.png'/>`, success: 0, failure: 1, advantage: 0, threat: 1, triumph: 0, despair: 0, light: 0, dark: 0 },
+    10: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/redtt.png'/>`, success: 0, failure: 0, advantage: 0, threat: 2, triumph: 0, despair: 0, light: 0, dark: 0 },
+    11: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/redtt.png'/>`, success: 0, failure: 0, advantage: 0, threat: 2, triumph: 0, despair: 0, light: 0, dark: 0 },
+    12: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/redd.png'/>`, success: 0, failure: 1, advantage: 0, threat: 0, triumph: 0, despair: 1, light: 0, dark: 0 },
+  };
+
+  CONFIG.FFG.DIFFICULTY_RESULTS = {
+    1: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/purple.png'/>`, success: 0, failure: 0, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    2: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/purplef.png'/>`, success: 0, failure: 1, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    3: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/purpleff.png'/>`, success: 0, failure: 2, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    4: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/purplet.png'/>`, success: 0, failure: 0, advantage: 0, threat: 1, triumph: 0, despair: 0, light: 0, dark: 0 },
+    5: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/purplet.png'/>`, success: 0, failure: 0, advantage: 0, threat: 1, triumph: 0, despair: 0, light: 0, dark: 0 },
+    6: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/purplet.png'/>`, success: 0, failure: 0, advantage: 0, threat: 1, triumph: 0, despair: 0, light: 0, dark: 0 },
+    7: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/purplett.png'/>`, success: 0, failure: 0, advantage: 0, threat: 2, triumph: 0, despair: 0, light: 0, dark: 0 },
+    8: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/purpleft.png'/>`, success: 0, failure: 1, advantage: 0, threat: 1, triumph: 0, despair: 0, light: 0, dark: 0 },
+  };
+
+  CONFIG.FFG.FORCE_RESULTS = {
+    1: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/whiten.png'/>`, success: 0, failure: 0, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 0, dark: 1 },
+    2: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/whiten.png'/>`, success: 0, failure: 0, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 0, dark: 1 },
+    3: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/whiten.png'/>`, success: 0, failure: 0, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 0, dark: 1 },
+    4: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/whiten.png'/>`, success: 0, failure: 0, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 0, dark: 1 },
+    5: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/whiten.png'/>`, success: 0, failure: 0, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 0, dark: 1 },
+    6: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/whiten.png'/>`, success: 0, failure: 0, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 0, dark: 1 },
+    7: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/whitenn.png'/>`, success: 0, failure: 0, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 0, dark: 2 },
+    8: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/whitel.png'/>`, success: 0, failure: 0, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 1, dark: 0 },
+    9: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/whitel.png'/>`, success: 0, failure: 0, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 1, dark: 0 },
+    10: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/whitell.png'/>`, success: 0, failure: 0, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 2, dark: 0 },
+    11: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/whitell.png'/>`, success: 0, failure: 0, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 2, dark: 0 },
+    12: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/whitell.png'/>`, success: 0, failure: 0, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 2, dark: 0 },
+  };
+
+  CONFIG.FFG.PROFICIENCY_RESULTS = {
+    1: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/yellow.png'/>`, success: 0, failure: 0, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    2: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/yellows.png'/>`, success: 1, failure: 0, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    3: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/yellows.png'/>`, success: 1, failure: 0, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    4: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/yellowss.png'/>`, success: 2, failure: 0, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    5: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/yellowss.png'/>`, success: 2, failure: 0, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    6: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/yellowa.png'/>`, success: 0, failure: 0, advantage: 1, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    7: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/yellowsa.png'/>`, success: 1, failure: 0, advantage: 1, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    8: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/yellowsa.png'/>`, success: 1, failure: 0, advantage: 1, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    9: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/yellowsa.png'/>`, success: 1, failure: 0, advantage: 1, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    10: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/yellowaa.png'/>`, success: 0, failure: 0, advantage: 2, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    11: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/yellowaa.png'/>`, success: 0, failure: 0, advantage: 2, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    12: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/yellowr.png'/>`, success: 1, failure: 0, advantage: 0, threat: 0, triumph: 1, despair: 0, light: 0, dark: 0 },
+  };
+
+  CONFIG.FFG.SETBACK_RESULTS = {
+    1: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/black.png'/>`, success: 0, failure: 0, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    2: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/black.png'/>`, success: 0, failure: 0, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    3: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/blackf.png'/>`, success: 0, failure: 1, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    4: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/blackf.png'/>`, success: 0, failure: 1, advantage: 0, threat: 0, triumph: 0, despair: 0, light: 0, dark: 0 },
+    5: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/blackt.png'/>`, success: 0, failure: 0, advantage: 0, threat: 1, triumph: 0, despair: 0, light: 0, dark: 0 },
+    6: { label: `<img src='systems/starwarsffg/images/dice/${dicetheme}/blackt.png'/>`, success: 0, failure: 0, advantage: 0, threat: 1, triumph: 0, despair: 0, light: 0, dark: 0 },
+  };
 
   // Register sheet application classes
   Actors.unregisterSheet("core", ActorSheet);
@@ -368,6 +461,21 @@ Hooks.once("init", async function () {
 
     return cost;
   });
+
+  Handlebars.registerHelper("math", function (lvalue, operator, rvalue, options) {
+    lvalue = parseFloat(lvalue);
+    rvalue = parseFloat(rvalue);
+
+    return {
+      "+": lvalue + rvalue,
+      "-": lvalue - rvalue,
+      "*": lvalue * rvalue,
+      "/": lvalue / rvalue,
+      "%": lvalue % rvalue,
+    }[operator];
+  });
+
+  TemplateHelpers.preload();
 });
 
 /* -------------------------------------------- */
@@ -396,12 +504,6 @@ Hooks.on("getSceneControlButtons", (controls) => {
 
 Hooks.once("canvasInit", (canvas) => {
   canvas.groupmanager = canvas.stage.addChildAt(new GroupManagerLayer(canvas), 8);
-
-  // Check for required modules and throw error notice if missing.
-  if (!game.requirements_installed) {
-    ui.notifications.error("ERROR: You must install and activate the 'Special-Dice-Roller' module in order for this system to function correctly.");
-    console.error("ERROR: You must install and activate the 'Special-Dice-Roller' module in order for this system to function correctly.");
-  }
 });
 
 Hooks.on("renderJournalSheet", (journal, obj, data) => {
@@ -414,7 +516,26 @@ Hooks.on("renderSidebarTab", (app, html, data) => {
   html.find(".roll-type-select label").click(async (event) => {
     const dicePool = new DicePoolFFG();
 
-    await DiceHelpers.displayRollDialog(game.user, dicePool, game.i18n.localize("SWFFG.RollingDefaultTitle"), "");
+    let user = {
+      data: game.user.data,
+    };
+
+    await DiceHelpers.displayRollDialog(user, dicePool, game.i18n.localize("SWFFG.RollingDefaultTitle"), "");
+  });
+});
+
+Hooks.on("renderActorDirectory", (app, html, data) => {
+  // add character import button
+  const div = $(`<div class="og-character-import"></div>`);
+  const divider = $("<hr><h4>OggDude Import</h4>");
+  const characterImportButton = $('<button class="og-character">Character</button>');
+  div.append(divider, characterImportButton);
+
+  html.find(".directory-footer").append(div);
+
+  html.find(".og-character").click(async (event) => {
+    event.preventDefault();
+    await ImportHelpers.characterImportDialog();
   });
 });
 
@@ -438,4 +559,7 @@ Hooks.once("ready", () => {
       }
     }
   });
+
+  // Wait to register hotbar drop hook on ready so that modules could register earlier if they want to
+  Hooks.on("hotbarDrop", (bar, data, slot) => createFFGMacro(data, slot));
 });

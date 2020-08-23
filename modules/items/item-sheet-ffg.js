@@ -1,5 +1,7 @@
 import PopoutEditor from "../popout-editor.js";
 import Helpers from "../helpers/common.js";
+import ModifierHelpers from "../helpers/modifiers.js";
+import ItemHelpers from "../helpers/item-helpers.js";
 
 /**
  * Extend the basic ItemSheet with some very simple modifications
@@ -51,7 +53,7 @@ export class ItemSheetFFG extends ItemSheet {
         break;
       case "criticalinjury":
       case "criticaldamage":
-        this.position.width = 275;
+        this.position.width = 320;
         break;
       case "forcepower":
         this.position.width = 715;
@@ -77,23 +79,81 @@ export class ItemSheetFFG extends ItemSheet {
 
           for (let talent in specializationTalents) {
             let gameItem;
-            if(specializationTalents[talent].pack && specializationTalents[talent].pack.length > 0) {
+            if (specializationTalents[talent].pack && specializationTalents[talent].pack.length > 0) {
               const pack = game.packs.get(specializationTalents[talent].pack);
               await pack.getIndex();
-              const entry = await pack.index.find(e => e._id === specializationTalents[talent].itemId);
-              
-              if(entry) {
+              const entry = await pack.index.find((e) => e._id === specializationTalents[talent].itemId);
+
+              if (entry) {
                 gameItem = await pack.getEntity(entry._id);
               }
             } else {
               gameItem = game.items.get(specializationTalents[talent].itemId);
             }
-    
+
             if (gameItem) {
               this._updateSpecializationTalentReference(specializationTalents[talent], gameItem.data);
             }
           }
         }
+        break;
+      case "species":
+        this.position.width = 550;
+
+        const attributesForCharacteristics = Object.keys(data.data.attributes).filter((key) => {
+          return Object.keys(CONFIG.FFG.characteristics).includes(key);
+        });
+
+        const speciesCharacteristics = attributesForCharacteristics.map((key) => Object.assign(data.data.attributes[key], { key }));
+        data.characteristics = Object.keys(CONFIG.FFG.characteristics).map((key) => {
+          let attr = speciesCharacteristics.find((item) => item.mod === key);
+
+          if (!attr) {
+            data.data.attributes[`${key}`] = {
+              modtype: "Characteristic",
+              mod: key,
+              value: 0,
+              exclude: true,
+            };
+            attr = {
+              key: `${key}`,
+              value: 0,
+            };
+          } else {
+            data.data.attributes[`${key}`].exclude = true;
+          }
+
+          return {
+            id: attr.key,
+            key,
+            value: attr?.value ? parseInt(attr.value, 10) : 0,
+            modtype: "Characteristic",
+            mod: key,
+            label: game.i18n.localize(CONFIG.FFG.characteristics[key].label),
+          };
+        });
+
+        if (!data.data.attributes?.Wounds) {
+          data.data.attributes.Wounds = {
+            modtype: "Stat",
+            mod: "Wounds",
+            value: 0,
+            exclude: true,
+          };
+        } else {
+          data.data.attributes.Wounds.exclude = true;
+        }
+        if (!data.data.attributes?.Strain) {
+          data.data.attributes.Strain = {
+            modtype: "Stat",
+            mod: "Strain",
+            value: 0,
+            exclude: true,
+          };
+        } else {
+          data.data.attributes.Strain.exclude = true;
+        }
+
         break;
       default:
     }
@@ -131,7 +191,7 @@ export class ItemSheetFFG extends ItemSheet {
     if (!this.options.editable) return;
 
     // Add or Remove Attribute
-    html.find(".attributes").on("click", ".attribute-control", this._onClickAttributeControl.bind(this));
+    html.find(".attributes").on("click", ".attribute-control", ModifierHelpers.onClickAttributeControl.bind(this));
 
     if (this.object.data.type === "criticalinjury" || this.object.data.type === "criticaldamage") {
       const formatDropdown = (item) => {
@@ -139,8 +199,7 @@ export class ItemSheetFFG extends ItemSheet {
           return item.text;
         }
 
-        // TODO: This will need to be replaced when the dependency on special-dice-roller is removed.
-        const imgUrl = "/modules/special-dice-roller/public/images/sw/purple.png";
+        const imgUrl = "/systems/starwarsffg/images/dice/starwars/purple.png";
 
         let images = [];
         for (let i = 0; i < item.id; i += 1) {
@@ -165,6 +224,8 @@ export class ItemSheetFFG extends ItemSheet {
 
     if (["forcepower", "specialization"].includes(this.object.data.type)) {
       html.find(".talent-action").on("click", this._onClickTalentControl.bind(this));
+      html.find(".talent-actions .fa-cog").on("click", ModifierHelpers.popoutModiferWindow.bind(this));
+      html.find(".talent-modifiers .fa-cog").on("click", ModifierHelpers.popoutModiferWindowUpgrade.bind(this));
     }
 
     if (this.object.data.type === "specialization") {
@@ -177,118 +238,23 @@ export class ItemSheetFFG extends ItemSheet {
 
       dragDrop.bind($(`form.editable.item-sheet-${this.object.data.type}`)[0]);
     }
-    
+
     // hidden here instead of css to prevent non-editable display of edit button
-    html.find(".popout-editor").on("mouseover", (event) => { 
-      $(event.currentTarget).find(".popout-editor-button").show(); 
+    html.find(".popout-editor").on("mouseover", (event) => {
+      $(event.currentTarget).find(".popout-editor-button").show();
     });
-    html.find(".popout-editor").on("mouseout", (event) => { 
-      $(event.currentTarget).find(".popout-editor-button").hide(); 
+    html.find(".popout-editor").on("mouseout", (event) => {
+      $(event.currentTarget).find(".popout-editor-button").hide();
     });
     html.find(".popout-editor .popout-editor-button").on("click", this._onPopoutEditor.bind(this));
   }
 
   /* -------------------------------------------- */
 
-  /**
-   * Listen for click events on an attribute control to modify the composition of attributes in the sheet
-   * @param {MouseEvent} event    The originating left click event
-   * @private
-   */
-  async _onClickAttributeControl(event) {
-    event.preventDefault();
-    const a = event.currentTarget;
-    const action = a.dataset.action;
-    const attrs = this.object.data.data.attributes;
-    const form = this.form;
-
-    // Add new attribute
-    if (action === "create") {
-      const nk = Object.keys(attrs).length + 1;
-      let newKey = document.createElement("div");
-      newKey.innerHTML = `<input type="text" name="data.attributes.attr${nk}.key" value="attr${nk}" style="display:none;"/><select class="attribute-modtype" name="data.attributes.attr${nk}.modtype"><option value="Characteristic">Characteristic</option></select><input class="attribute-value" type="text" name="data.attributes.attr${nk}.value" value="0" data-dtype="Number" placeholder="0"/>`;
-      form.appendChild(newKey);
-      await this._onSubmit(event);
-    }
-
-    // Remove existing attribute
-    else if (action === "delete") {
-      const li = a.closest(".attribute");
-      li.parentElement.removeChild(li);
-      await this._onSubmit(event);
-    }
-  }
-
-  /* -------------------------------------------- */
-
   /** @override */
   _updateObject(event, formData) {
-    CONFIG.logger.debug(`Updating ${this.object.type}`);
-
-    // Handle the free-form attributes list
-    const formAttrs = expandObject(formData)?.data?.attributes || {};
-    const attributes = Object.values(formAttrs).reduce((obj, v) => {
-      let k = v["key"].trim();
-      if (/[\s\.]/.test(k)) return ui.notifications.error("Attribute keys may not contain spaces or periods");
-      delete v["key"];
-      obj[k] = v;
-      return obj;
-    }, {});
-
-    // Remove attributes which are no longer used
-    if (this.object.data?.data?.attributes) {
-      for (let k of Object.keys(this.object.data.data.attributes)) {
-        if (!attributes.hasOwnProperty(k)) attributes[`-=${k}`] = null;
-      }
-    }
-
-    // Re-combine formData
-    formData = Object.entries(formData)
-      .filter((e) => !e[0].startsWith("data.attributes"))
-      .reduce(
-        (obj, e) => {
-          obj[e[0]] = e[1];
-          return obj;
-        },
-        { _id: this.object._id, "data.attributes": attributes }
-      );
-
-    // Update the Item
-    this.item.data.flags.loaded = false;
-    return this.object.update(formData);
-
-    if(this.object.data.type === "talent" ) {
-      let data = this.object.data.data;
-      if(data.trees.length > 0) {
-        CONFIG.logger.debug("Using Talent Tree property for update");
-        data.trees.forEach(spec => {
-          const specializations = game.data.items.filter(item => {
-            return item.id === spec;
-          })
-  
-          specializations.forEach(item => {
-            CONFIG.logger.debug(`Updating Specialization`)
-            for (let talentData in item.data.talents) {
-              this._updateSpecializationTalentReference(item.data.talents[talentData], itemData);
-            }
-          })
-        });
-      } else {
-        CONFIG.logger.debug("Legacy item, updating all specializations");
-          game.data.items.forEach(item => {
-            if(item.type === "specialization") {
-              for (let talentData in item.data.talents) {
-                if(item.data.talents[talentData].itemId === this.object.data._id) {
-                  if(!data.trees.includes(item._id)) {
-                    data.trees.push(item._id);
-                  }
-                  this._updateSpecializationTalentReference(item.data.talents[talentData], itemData);
-                }
-              }
-            }
-          })
-      }
-    }
+    const itemUpdate = ItemHelpers.itemUpdate.bind(this);
+    itemUpdate(event, formData);
   }
 
   async _onClickTalentControl(event) {
@@ -458,32 +424,35 @@ export class ItemSheetFFG extends ItemSheet {
     }
 
     if (itemObject.data.type === "talent") {
-      
-
       // we need to remove if this is the last instance of the talent in the specialization
       const previousItemId = $(li).find(`input[name='data.talents.${talentId}.itemId']`).val();
       const isPreviousItemFromPack = $(li).find(`input[name='data.talents.${talentId}.pack']`).val() === "" ? false : true;
       if (!isPreviousItemFromPack) {
-        CONFIG.logger.debug('Non-compendium pack talent update');
+        CONFIG.logger.debug("Non-compendium pack talent update");
 
         const talentList = [];
-        for(let talent in specialization.data.data.talents) {
+        for (let talent in specialization.data.data.talents) {
           if (talent.itemId === itemObject.id) {
             talentList.push(talent);
           }
         }
 
         // check if this is the last talent of the specializtion
-        if(talentList.length === 1) {
+        if (talentList.length === 1) {
           let tree = itemObject.data.data.trees;
 
-          const index = tree.findIndex(tal => {
+          const index = tree.findIndex((tal) => {
             return tal === specialization.id;
           });
 
-          // remove the specialization reference fromt the talent
+          // remove the specialization reference from the talent
           tree.splice(index, 1);
-          itemObject.update({ [`data.trees`] : tree });
+
+          let formData;
+          setProperty(formData, `data.trees`, tree);
+          itemObject.update(formData);
+
+          //itemObject.update({ [`data.trees`]: tree });
         }
       }
 
@@ -497,13 +466,16 @@ export class ItemSheetFFG extends ItemSheet {
       $(li).find(`input[name='data.talents.${talentId}.pack']`).val(data.pack);
 
       // check to see if the talent already has a reference to the specialization
-      if(!itemObject.data.data.trees.includes(specialization.id)) {
+      if (!itemObject.data.data.trees.includes(specialization.id)) {
         // the talent doesn't already have the reference, add it
         let tree = itemObject.data.data.trees;
         tree.push(specialization.id);
 
-        if(!data.pack) {
-          itemObject.update({ [`data.trees`] : tree });
+        if (!data.pack) {
+          let formData;
+          setProperty(formData, `data.trees`, tree);
+          itemObject.update(formData);
+          //itemObject.update({ [`data.trees`]: tree });
         }
       }
 
@@ -519,5 +491,6 @@ export class ItemSheetFFG extends ItemSheet {
     specializationTalentItem.activationLabel = talentItem.data.activation.label;
     specializationTalentItem.isRanked = talentItem.data.ranks.ranked;
     specializationTalentItem.isForceTalent = talentItem.data.isForceTalent;
+    specializationTalentItem.attributes = talentItem.data.attributes;
   }
 }

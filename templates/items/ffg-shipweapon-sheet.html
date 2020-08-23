@@ -63,20 +63,39 @@
           </div>
 
           <div class="container flex-group-center weapon-values">
-            <div class="resource single">
+            <div class="resource double">
               <div class="attribute flex-group-center">
                 <div class="block-background">
                   <div class="block-title">
                     {{localize "SWFFG.VehicleTabFiringArc"}}
                   </div>
                   <div class="block-attribute">
-                    <select style="text-align:center;" name="data.firingarc.value">
-                      {{#select data.firingarc.value}}
-                        {{#each this.FFG.fire_arcs as |t|}}
-                        <option value="{{t.value}}">{{localize t.label}}</option>
-                        {{/each}}
-                      {{/select}}
-                    </select>
+                    <div class="grid grid-2col firing-arcs">
+                      <div>
+                        <input type="checkbox" id="data.firingarc.fore" name="data.firingarc.fore" {{checked data.firingarc.fore}} />
+                        <label for="data.firingarc.fore"> {{localize "SWFFG.VehicleFiringArcForward"}}</label>
+                      </div>
+                      <div>
+                        <input type="checkbox" id="data.firingarc.aft" name="data.firingarc.aft" {{checked data.firingarc.aft}} />
+                        <label for="data.firingarc.aft"> {{localize "SWFFG.VehicleFiringArcAft"}}</label>
+                      </div>
+                      <div>
+                        <input type="checkbox" id="data.firingarc.port" name="data.firingarc.port" {{checked data.firingarc.port}} />
+                        <label for="data.firingarc.port"> {{localize "SWFFG.VehicleFiringArcPort"}}</label>
+                      </div>
+                      <div>
+                        <input type="checkbox" id="data.firingarc.starboard" name="data.firingarc.starboard" {{checked data.firingarc.starboard}} />
+                        <label for="data.firingarc.starboard"> {{localize "SWFFG.VehicleFiringArcStarboard"}}</label>
+                      </div>
+                      <div>
+                        <input type="checkbox" id="data.firingarc.dorsal" name="data.firingarc.dorsal" {{checked data.firingarc.dorsal}} />
+                        <label for="data.firingarc.dorsal"> {{localize "SWFFG.VehicleFiringArcDorsal"}}</label>
+                      </div>
+                      <div>
+                        <input type="checkbox" id="data.firingarc.ventral" name="data.firingarc.ventral" {{checked data.firingarc.ventral}} />
+                        <label for="data.firingarc.ventral"> {{localize "SWFFG.VehicleFiringArcVentral"}}</label>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -136,6 +155,7 @@
                         <div class="popout-editor-button"><i class="fas fa-edit"></i></div>
                         {{{renderDiceTags data.special.value}}}
                       </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -146,71 +166,22 @@
     </div>
   </header>
 
-    {{!-- Sheet Tab Navigation --}}
-    <nav class="sheet-tabs tabs" data-group="primary">
-      <a class="item" data-tab="description">{{localize "SWFFG.TabDescription"}}</a>
-      <a class="item" data-tab="attributes">{{localize "SWFFG.TabModifiers"}}</a>
-    </nav>
+  {{!-- Sheet Tab Navigation --}}
+  <nav class="sheet-tabs tabs" data-group="primary">
+    <a class="item" data-tab="description">{{localize "SWFFG.TabDescription"}}</a>
+    <a class="item" data-tab="attributes">{{localize "SWFFG.TabModifiers"}}</a>
+  </nav>
 
-    {{!-- Sheet Body --}}
-    <section class="sheet-body small">
+  {{!-- Sheet Body --}}
+  <section class="sheet-body small">
+    {{!-- Description Tab --}}
+    <div class="tab" data-group="primary" data-tab="description">
+      {{editor content=data.renderedDesc target="data.description" button=true owner=owner editable=editable}}
+    </div>
 
-        {{!-- Description Tab --}}
-        <div class="tab" data-group="primary" data-tab="description">
-            {{editor content=data.renderedDesc target="data.description" button=true owner=owner editable=editable}}
-        </div>
-
-        {{!-- Modifiers Tab --}}
-        <div class="tab attributes" data-group="primary" data-tab="attributes">
-            <header class="attributes-header flexrow">
-              <!-- <span class="attribute-key">ID</span> -->
-              <span class="attribute-modtype">{{localize "SWFFG.ModifierType"}}</span>
-              <span class="attribute-mod">{{localize "SWFFG.Modifier"}}</span>
-              <span class="attribute-value">{{localize "SWFFG.ModifierValue"}}</span>
-              <a class="attribute-control" data-action="create"><i class="fas fa-plus"></i></a>
-            </header>
-
-            <ol class="attributes-list">
-            {{#each data.attributes as |attr key|}}
-                <li class="attribute flexrow" data-attribute="{{key}}">
-                    <input class="attribute-key" type="text" name="data.attributes.{{key}}.key" value="{{key}}" style="display:none;"/>
-                    <select class="attribute-modtype" name="data.attributes.{{key}}.modtype">
-                        {{#select attr.modtype}}
-                        {{#each ../this.FFG.mod_types as |t|}}
-                        <option value="{{t.value}}">{{localize t.label}}</option>
-                        {{/each}}
-                        {{/select}}
-                    </select>
-                    <select class="attribute-mod" name="data.attributes.{{key}}.mod">
-                        {{#select attr.mod}}
-                        {{#iff attr.modtype '==' 'Stat' }}
-                        {{#each ../this.FFG.character_stats as |t|}}
-                        <option value="{{t.value}}">{{localize t.label}}</option>
-                        {{/each}}
-                        {{/iff}}
-                        {{#iff attr.modtype '==' 'Skill Rank' }}
-                        {{#each ../this.FFG.skills as |t|}}
-                        <option value="{{t.value}}">{{localize t.label}}</option>
-                        {{/each}}
-                        {{/iff}}
-                        {{#iff attr.modtype '==' 'Skill Boost' }}
-                        {{#each ../this.FFG.skills as |t|}}
-                        <option value="{{t.value}}">{{localize t.label}}</option>
-                        {{/each}}
-                        {{/iff}}
-                        {{#iff attr.modtype '==' 'Characteristic' }}
-                        {{#each ../this.FFG.characteristics as |t|}}
-                        <option value="{{t.value}}">{{localize t.label}}</option>
-                        {{/each}}
-                        {{/iff}}
-                        {{/select}}
-                    </select>
-                    <input class="attribute-value" type="text" name="data.attributes.{{key}}.value" value="{{attr.value}}" data-dtype="{{attr.dtype}}" placeholder="0"/>
-                    <!-- <input class="attribute-label" type="text" name="data.attributes.{{key}}.label" value="{{attr.label}}"/> -->
-                    <a class="attribute-control" data-action="delete"><i class="fas fa-trash"></i></a>
-                </li>
-            {{/each}}
-            </ol>
-        </div>
-    </section>
+    {{!-- Modifiers Tab --}}
+    <div class="tab attributes" data-group="primary" data-tab="attributes">
+      {{> "systems/starwarsffg/templates/parts/shared/ffg-modifiers.html"}}
+    </div>
+  </section>
 </form>

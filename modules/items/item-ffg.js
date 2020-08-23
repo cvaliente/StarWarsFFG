@@ -21,6 +21,7 @@ export class ItemFFG extends Item {
 
     data.renderedDesc = PopoutEditor.renderDiceImages(data.description);
     itemData.safe_desc = PopoutEditor.renderDiceImages(data.description.replace(/(<([^>]+)>)/gi, ""));
+    data.safe_spec = PopoutEditor.renderDiceImages(data.special?.value.replace(/(<([^>]+)>)/gi, ""));
 
     // perform localisation of dynamic values
     switch (this.type) {
@@ -28,10 +29,10 @@ export class ItemFFG extends Item {
         const rangeId = `SWFFG.WeaponRange${this._capitalize(data.range.value)}`;
         data.range.label = rangeId;
 
-        if(this.isOwned && this.actor) {
-          if(data.skill.value === "Melee" || data.skill.value === "Brawl") {
+        if (this.isOwned && this.actor && this.actor.type !== "vehicle") {
+          if (data.skill.value === "Melee" || data.skill.value === "Brawl") {
             let damageAdd = 0;
-            for(let attr in data.attributes) {
+            for (let attr in data.attributes) {
               if (data.attributes[attr].mod === "damage" && data.attributes[attr].modtype === "Weapon Stat") {
                 damageAdd += parseInt(data.attributes[attr].value, 10);
               }
@@ -45,8 +46,8 @@ export class ItemFFG extends Item {
       case "shipweapon":
         const vehiclerangeId = `SWFFG.VehicleRange${this._capitalize(data.range.value)}`;
         data.range.label = vehiclerangeId;
-        const firingarcId = `SWFFG.VehicleFiringArc${this._capitalize(data.firingarc.value)}`;
-        data.firingarc.label = firingarcId;
+        // const firingarcId = `SWFFG.VehicleFiringArc${this._capitalize(data.firingarc.value)}`;
+        // data.firingarc.label = firingarcId;
         break;
       case "talent":
         const cleanedActivationName = data.activation.value.replace(/[\W_]+/g, "");
@@ -89,7 +90,7 @@ export class ItemFFG extends Item {
         if (talents[upgrade].islearned) {
           const item = JSON.parse(JSON.stringify(talents[upgrade]));
 
-          if(item.isRanked || listProperty === "powerUpgrades") {
+          if (item.isRanked || listProperty === "powerUpgrades") {
             item.rank = 1;
           } else {
             item.rank = "N/A";
@@ -157,22 +158,22 @@ export class ItemFFG extends Item {
     const specializationTalents = this.data.data.talents;
     for (let talent in specializationTalents) {
       let gameItem;
-      if(specializationTalents[talent].pack && specializationTalents[talent].pack.length > 0) {
+      if (specializationTalents[talent].pack && specializationTalents[talent].pack.length > 0) {
         try {
           const pack = game.packs.get(specializationTalents[talent].pack);
           await pack.getIndex();
-          const entry = pack.index.find(e => e._id === specializationTalents[talent].itemId);
+          const entry = pack.index.find((e) => e._id === specializationTalents[talent].itemId);
           gameItem = (await pack.getEntity(entry._id)).data;
         } catch {
-          CONFIG.logger.debug('Pack Item, deferring load.')
+          CONFIG.logger.debug("Pack Item, deferring load.");
         }
       } else {
-        gameItem = game.data.items.find(item => {
+        gameItem = game.data.items.find((item) => {
           return item._id === specializationTalents[talent].itemId;
         });
       }
-     
-      if(gameItem && !this.isOwned) {
+
+      if (gameItem && !this.isOwned) {
         this._updateSpecializationTalentReference(specializationTalents[talent], gameItem);
       }
     }
@@ -195,5 +196,49 @@ export class ItemFFG extends Item {
     specializationTalentItem.activationLabel = talentItem.data.activation.label;
     specializationTalentItem.isRanked = talentItem.data.ranks.ranked;
     specializationTalentItem.isForceTalent = talentItem.data.isForceTalent;
+    specializationTalentItem.attributes = talentItem.data.attributes;
+  }
+
+  /**
+   * Prepare and return details of the item for display in inventory or chat.
+   */
+  getItemDetails() {
+    const data = duplicate(this.data.data);
+
+    // Item type specific properties
+    const props = [];
+
+    data.prettyDesc = PopoutEditor.renderDiceImages(data.description);
+
+    // General equipment properties
+    if (this.type !== "talent") {
+      if (data.hasOwnProperty("special")) {
+        if (data.safe_spec) props.push("<div>Special qualities: " + data.special.value + "</div");
+      }
+      if (data.hasOwnProperty("equippable")) {
+        props.push(game.i18n.localize(data.equippable.equipped ? "SWFFG.Equipped" : "SWFFG.Unequipped"));
+      }
+      if (data.hasOwnProperty("encumbrance")) {
+        props.push("Encumbrance: " + data.encumbrance.value);
+      }
+      if (data.hasOwnProperty("price")) {
+        props.push("Price: " + data.price.value);
+      }
+      if (data.hasOwnProperty("rarity")) {
+        props.push("Rarity: " + data.rarity.value);
+      }
+    }
+
+    // Talent properties
+    if (data.hasOwnProperty("isForceTalent")) {
+      if (data.isForceTalent) props.push(game.i18n.localize("SWFFG.ForceTalent"));
+    }
+    if (data.hasOwnProperty("ranks")) {
+      if (data.ranks.ranked) props.push(game.i18n.localize("SWFFG.Ranked"));
+    }
+
+    // Filter properties and return
+    data.properties = props.filter((p) => !!p);
+    return data;
   }
 }

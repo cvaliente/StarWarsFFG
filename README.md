@@ -5,14 +5,7 @@ This is an implementation of the [Fantasy Flight Games Star Wars](https://www.fa
 - For support on this game system : Discord [The Foundry](https://discord.gg/bNyxuk9) #starwars-ffg
 - Read this document in another language : [Français](https://github.com/StarWarsFoundryVTT/StarWarsFFG/blob/master/README-fr.md)
 
-# Requirements
-
-The system requires the [Special Dice Roller](https://foundry-vtt-community.github.io/wiki/Community-Modules/#special-dice-roller) Module to Roll the dice and calculate the results.
-This is most easily available from the in-game Module browser. After installing it you will need to activate it on your world. [GitHub](https://github.com/BernhardPosselt/foundryvtt-special-dice-roller)
-
-# Installing
-
-## Installing Star Wars FFG game system
+# Installing Star Wars FFG game system
 
 1. Open Foundry VTT
 2. Go to the "Game Systems" Tab
@@ -21,13 +14,6 @@ This is most easily available from the in-game Module browser. After installing 
    https://raw.githubusercontent.com/StarWarsFoundryVTT/StarWarsFFG/master/system.json
 5. Click Install, after a few seconds the system should be installed.
 6. Install (if not already done) "Special Dice Roller" module, see below for details.
-
-## Installing Special Dice Roller module
-
-1. Go to "Add-on Modules" Tab
-2. Click the "Install Module" button
-3. In the search field, type "Special"
-4. Press the "Install" button for the "Special Dice Roller" module.
 
 # Contributing
 
@@ -39,7 +25,81 @@ See our current production goals and progress [here](https://github.com/StarWars
 
 # Changelog
 
+- 21/08/2020 - Cstadther - Fixed issue with imported characters displaying talents incorrectly.  Allowed import of qualities with no description to be imported.
+- 21/08/2020 - Cstadther - Added ability to select OggDude import file from local client, so uploading to server is not needed.
+- 20/08/2020 - Cstadther - Fixed import issue where weapon count was not listed in XML file, default to count 1.
+- 20/08/2020 - Cstadther - Fixed display and functionality for vehichle sheets, switched to using partial for items/weapons.
+- 20/08/2020 - Cstadther - Applied same code from Character to Adversary sheet.  Updated minions, so that skills can be upgraded as non-squad minions.
+- 20/08/2020 - Cstadther - Fixed issue where minion Soak was always increasing.
+- 19/08/2020 - Esrin - Updated Roll template and ItemDetails methods to correctly display the new embedded Item Qualities.
+- 18/08/2020 - Cstadther - Fixed actor sheet updates as they were broken with the new formData deep object.
+- 18/08/2020 - Cstadther - Added Item Qualities to Oggdude Import. Will import qualities as Journal Entries and attach them to weapons in specials area.
+- 18/08/2020 - Cstadther - Fixed Weapon Import ranges which was using a none standard field, fixed item sheet updates as they were broken with the new formData deep object, fixed issue with weapon stat modifiers.
+- 18/08/2020 - Cstadther - Updated import to refactor xml parsing into helper function that handles BOM removal.
+- 17/08/2020 - Cstadther - Fixed import of force spec to add force pool modifier.
+- 17/08/2020 - Cstadther - Fixed issue with `cybernetics` in character import.
+- 15/08/2020 - Esrin - Added Special Qualities display to item rolls where applicable.
+- 15/08/2020 - Esrin - Reworked inventory, talent and critical injury displays in order to replace old tooltips with an item details fold-out on click.
+- 14/08/2020 - Cstadther - Updated character import to handle cases where modifiers on career and specializations were not initialized at 0;
+- 13/08/2020 - Cstadther - Bugfix - Fixed character import error for no force powers. Fixed error for no max property on character data.
+- 12/08/2020 - Cstadther - Refactored \_updateObject function into new item helper class, and update all formData references to new object structure.
+- 12/08/2020 - Cstadther - Refactored \_updateObject function into new actor helper class
+- 11/08/2020 - Esrin - Bugfix to the modifiers template to ensure all modifiers are stored as data-dtype="Number" to avoid type errors such as string concatenation instead of Math() addition.
+- 11/08/2020 - Esrin - Changed ActorFFG prepareData() method to prepareDerivedData() to match the new 0.7.1 best practice workflow.
+- 11/08/2020 - Esrin - Update to declare the default Roll method as per 0.7.1 Foundry changes.
+- 03/08/2020 - Esrin - Work in progress on [ROLL][/roll] tag, currently only parsed for testing in actor biography. Can be used to create a rollable skill button, for example: [ROLL]Brawl, 2[/ROLL] will result in the creation of an Average Brawl check button within the biography. Not certain if this functionality is going to be useful yet so limiting to actor bios while I work on it.
+- 03/08/2020 - Esrin - Added functionality for hotbar drag-drop weapon roll macro creation.
+- 03/08/2020 - Esrin - Minor bugfix to Brawl abbreviation localisation tag in `swffg-config.js`.
+- 03/08/2020 - Esrin - Added ability to roll with `weapon` items directly from inventory window by clicking on the associated `Skill` field. Subsequent roll chat message includes item info such as calculated damage and critical rating along with item name and icon.
+- 03/08/2020 - Esrin - Restyled #chat-log messages and #chat-form text area to match system styling.
+- 03/08/2020 - Esrin - Reduced dead space at the bottom of the character and minion sheet-body area.
+- 03/08/2020 - Esrin - Added left click / right click instruction text to roll dialog.
+- 03/08/2020 - Esrin - Added item description tooltip to critical injuries on character sheets.
+- 02/08/2020 - Cstadther - OggDude Character Import. You can now import characters from an OggDude export. The button is located on the Actor tab on the right.
+- 01/08/2020 - Cstadther - Bug Fix #283 - Updated code to add custom skills to list, and sort them properly by abbreviation.
+- 01/08/2020 - Cstadther - Added oggdude dataset import for vehicles.
+- 30/07/2020 - Cstadther - Fix for issue where Remove Setback was incorrectly trying to be added to the dice pool.
+- 30/07/2020 - Cstadther - Added ability to add modifiers to Force Powers and the Force Power Upgrades. Updated imported to populate force power modifiers.
+- 29/07/2020 - Cstadther - Fixes issue where Strain, Wounds, and Soak default values were not being calculated correctly.
+- 29/07/2020 - Cstadther - Updated Critical Damage and Injury sheets to allow modifiers. Fixed Adversary sheet to allow clicking on Criticals. Refactored criticals to a partial.
+- 29/07/2020 - Cstadther - Updated data importer to populate Force Boost modifiers on talents
+- 29/07/2020 - Cstadther - Added Force Boost modifier. When added to an item, if checked, it will add the max force pool to the rendered dice pool, and include that number of force die in the roll.
+- 29/07/2020 - Cstadther - Bug Fix #270 - Fix which allows no PC characters to go above the max, however all NPCs no longer adhere to any maximum for skill rank.
+- 29/07/2020 - Cstadther - Updated data importer to populate skill boost/skill setback/skill remove setback modifiers for armor, gear, talents, and weapons.
+- 29/07/2020 - Cstadther - Added Remove Setback modifier, updated dice pool rendering display Remove Setback image, updated dice pool calculation on actor to cancel out setback dice with remove setback dice.
+- 28/07/2020 - Cstadther - Added Species Import from Oggdude dataset.
+- 28/07/2020 - Cstadther - Added Career Import from Oggdude dataset.
+- 28/07/2020 - Cstadther - Added ranked talents to multiply modifier value correctly.
+- 28/07/2020 - Cstadther - Updated importer to import career skills, skill ranks, and skill boosts on talents.
+- 27/07/2020 - Cstadther - Added specialization modifiers via popout modifiers window (new cog icon on specialization screen)
+- 24/07/2020 - Esrin - System is now compatible with Foundry VTT 0.7.0 and upwards only. Previous Foundry versions are not supported.
+- 24/07/2020 - Esrin - Implemented new Roll / Dice system using the expanded Foundry VTT 0.7.x dice API. The requirement for Special-Dice-Roller module has now been removed.
+- 23/07/2020 - Cstadther - Added Career item type, sheet and integration on character sheet.
+- 23/07/2020 - Cstadther - Added Career item type, sheet and integration on character/adversary sheet.
+- 23/07/2020 - Cstadther - Bug Fix #255 - Clicking on critical injuries was not bringing up sheet.
+- 23/07/2020 - Cstadther - Added Skill Boost and Skill Setback modifiers, refactored dice pool display to include boost and setback.
+- 22/07/2020 - Cstadther - Refactored minion sheet to use skills partial, updated skills partial to handle groupskills
+- 22/07/2020 - Cstadther - Added sheet options for Adversary for removing auto soak calculation (but only unlocks the soak field)
+- 22/07/2020 - Cstadther - Refactored character sheets using handlebar partials for skill, items, talents and force powers (shared with character and adversary sheets)
+- 22/07/2020 - Cstadther - Added modifiers for Career Skills
+- 22/07/2020 - Cstadther - Minor GroupManager fix to remove instance where groupmanager is undefined
+- 21/07/2020 - Cstadther - Specialization Talents now apply stat/skill rank/characteristic modifiers. Importer was updated to apply stat/skill rank/characteristic modifiers for weapons/armor/gear.
+- 20/07/2020 - Cstadther - Refactored modifier part 2, fixed issue with weapon mods, added new mod (setback and career skill), updated importer to correctly populate talent and specialization characteristic and stat modifiers.
+- 20/07/2020 - Cstadther - Bug Fix #243 - Updated english localization to used knowledge stripped values and updated skill grid layout.
+- 20/07/2020 - Cstadther - Refactored modifier display to a partial. Refactored applying logic.
+- 20/07/2020 - Cstadther - Added skill rank modifiers, works for current skills and any new added skills correctly.
+- 20/07/2020 - Cstadther - Stat modifiers save on update of actor and store value of difference in attribute.
+- 19/07/2020 - Cstadther - Bug Fix #212 - Vehicle weapons are now imported correctly as Vehicle Weapons.
+- 19/07/2020 - Cstadther - Enhancement #213 - When weapon skill is changed to `Melee` or `Brawl` damage field is disabled, as base damage for those weapon types is autocalculated using brawl when owned by an actor. Specify damage as a modifier to damage (ie +3, etc)
+- 19/07/2020 - Cstadther - Bug Fix #227 - Fixed issue with critical injuries and damage description areas not big enough.
+- 19/07/2020 - Cstadther - Bug Fix #232 - Fixed issue with minion groupskill calculations
+- 19/07/2020 - Cstadther - Bug Fix #222 - Fixed issue where soak options were not being used on Adversary Sheet.
+- 18/07/2020 - Cstadther - Added characteristic and stat migration to attributes for existing characters.
 - 17/07/2020 - Cstadther - Bug Fix #218 - Fixed the Minion Sheet's scrolling issue
+- 17/07/2020 - Cstadther - Bug Fix #214 - disabling force pool will now also disable force powers section
+- 17/07/2020 - Cstadther - Add stat modifiers, and reworked Soak/Defence calculation to allow for modifiers of just Melee or Ranged Defense
+- 17/07/2020 - Cstadther - Add characteristic modifiers to character/adversary/minion sheets, add drag/drop of species onto character/adversaries (not minion)
+- 16/07/2020 - Cstadther - Added species item type, values stored in modifiers, preparing for characteristic modifiers.
 - 16/07/2020 - Cstadther - Fix for specialization and talent combined talent list for adversaries and characters.
 - 15/07/2020 - Cstadther - Import fix for specializations, prepopulate data that is not being populated through item-ffg.js load routine.
 - 15/07/2020 - Cstadther - CSS Fix, set flex to `auto` on character sheet to resolve issue with different form height between FF and Chrome

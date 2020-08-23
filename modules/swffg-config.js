@@ -34,23 +34,23 @@ FFG.characteristics = {
 };
 
 FFG.weapon_stats = {
-  "damage" : {
-    value : "damage",
-    label : "SWFFG.ItemsDamage"
+  "damage": {
+    value: "damage",
+    label: "SWFFG.ItemsDamage",
   },
-  "critical" : {
-    value : "critical",
-    label : "SWFFG.ItemsCrit", 
+  "critical": {
+    value: "critical",
+    label: "SWFFG.ItemsCrit",
   },
-  "encumbrance" : {
-    value : "emcubrance",
-    label : "SWFFG.ItemsEncum", 
+  "encumbrance": {
+    value: "emcubrance",
+    label: "SWFFG.ItemsEncum",
   },
-  "hardpoints" : {
-    value : "hardpoints",
-    label : "SWFFG.ItemsHP", 
-  }
-}
+  "hardpoints": {
+    value: "hardpoints",
+    label: "SWFFG.ItemsHP",
+  },
+};
 
 FFG.character_stats = {
   "wounds": {
@@ -65,9 +65,13 @@ FFG.character_stats = {
     value: "Soak",
     label: "SWFFG.Soak",
   },
-  "defence": {
-    value: "Defence",
-    label: "SWFFG.Defense",
+  "defencemelee": {
+    value: "Defence-Melee",
+    label: "SWFFG.DefenseMeleeLabel",
+  },
+  "defenceranged": {
+    value: "Defence-Ranged",
+    label: "SWFFG.DefenseRangedLabel",
   },
   "encumbrance": {
     value: "Encumbrance",
@@ -77,48 +81,44 @@ FFG.character_stats = {
     value: "ForcePool",
     label: "SWFFG.ForcePool",
   },
-  "credits": {
-    value: "Credits",
-    label: "SWFFG.DescriptionCredits",
-  },
 };
 
 FFG.skills = {
-  "Astrogation": { value: "Astrogation", label: "SWFFG.SkillsNameAstrogation" },
-  "Athletics": { value: "Athletics", label: "SWFFG.SkillsNameAthletics" },
-  "Brawl": { value: "Brawl", label: "SWFFG.SkillsNameBrawl" },
-  "Charm": { value: "Charm", label: "SWFFG.SkillsNameCharm" },
-  "Coercion": { value: "Coercion", label: "SWFFG.SkillsNameCoercion" },
-  "Computers": { value: "Computers", label: "SWFFG.SkillsNameComputers" },
-  "Cool": { value: "Cool", label: "SWFFG.SkillsNameCool" },
-  "Coordination": { value: "Coordination", label: "SWFFG.SkillsNameCoordination" },
-  "Deception": { value: "Deception", label: "SWFFG.SkillsNameDeception" },
-  "Discipline": { value: "Discipline", label: "SWFFG.SkillsNameDiscipline" },
-  "Gunnery": { value: "Gunnery", label: "SWFFG.SkillsNameGunnery" },
-  "Knowledge: Core Worlds": { value: "Knowledge: Core Worlds", label: "SWFFG.SkillsNameKnowledgeCoreWorlds" },
-  "Knowledge: Education": { value: "Knowledge: Education", label: "SWFFG.SkillsNameKnowledgeEducation" },
-  "Knowledge: Lore": { value: "Knowledge: Lore", label: "SWFFG.SkillsNameKnowledgeLore" },
-  "Knowledge: Outer Rim": { value: "Knowledge: Outer Rim", label: "SWFFG.SkillsNameKnowledgeOuterRim" },
-  "Knowledge: Underworld": { value: "Knowledge: Underworld", label: "SWFFG.SkillsNameKnowledgeUnderworld" },
-  "Knowledge: Warfare": { value: "Knowledge: Warfare", label: "SWFFG.SkillsNameKnowledgeWarfare" },
-  "Knowledge: Xenology": { value: "Knowledge: Xenology", label: "SWFFG.SkillsNameKnowledgeXenology" },
-  "Leadership": { value: "Leadership", label: "SWFFG.SkillsNameLeadership" },
-  "Lightsaber": { value: "Lightsaber", label: "SWFFG.SkillsNameLightsaber" },
-  "Mechanics": { value: "Mechanics", label: "SWFFG.SkillsNameMechanics" },
-  "Medicine": { value: "Medicine", label: "SWFFG.SkillsNameMedicine" },
-  "Melee": { value: "Melee", label: "SWFFG.SkillsNameMelee" },
-  "Negotiation": { value: "Negotiation", label: "SWFFG.SkillsNameNegotiation" },
-  "Perception": { value: "Perception", label: "SWFFG.SkillsNamePerception" },
-  "Piloting: Planetary": { value: "Piloting: Planetary", label: "SWFFG.SkillsNamePilotingPlanetary" },
-  "Piloting: Space": { value: "Piloting: Space", label: "SWFFG.SkillsNamePilotingSpace" },
-  "Ranged: Heavy": { value: "Ranged: Heavy", label: "SWFFG.SkillsNameRangedHeavy" },
-  "Ranged: Light": { value: "Ranged: Light", label: "SWFFG.SkillsNameRangedLight" },
-  "Resilience": { value: "Resilience", label: "SWFFG.SkillsNameResilience" },
-  "Skulduggery": { value: "Skulduggery", label: "SWFFG.SkillsNameSkulduggery" },
-  "Stealth": { value: "Stealth", label: "SWFFG.SkillsNameStealth" },
-  "Streetwise": { value: "Streetwise", label: "SWFFG.SkillsNameStreetwise" },
-  "Survival": { value: "Survival", label: "SWFFG.SkillsNameSurvival" },
-  "Vigilance": { value: "Vigilance", label: "SWFFG.SkillsNameVigilance" },
+  "Astrogation": { value: "Astrogation", label: "SWFFG.SkillsNameAstrogation", abrev: "SWFFG.SkillsNameAstrogation" },
+  "Athletics": { value: "Athletics", label: "SWFFG.SkillsNameAthletics", abrev: "SWFFG.SkillsNameAthletics" },
+  "Brawl": { value: "Brawl", label: "SWFFG.SkillsNameBrawl", abrev: "SWFFG.SkillsNameBrawlAbbreviation" },
+  "Charm": { value: "Charm", label: "SWFFG.SkillsNameCharm", abrev: "SWFFG.SkillsNameCharm" },
+  "Coercion": { value: "Coercion", label: "SWFFG.SkillsNameCoercion", abrev: "SWFFG.SkillsNameCoercion" },
+  "Computers": { value: "Computers", label: "SWFFG.SkillsNameComputers", abrev: "SWFFG.SkillsNameComputers" },
+  "Cool": { value: "Cool", label: "SWFFG.SkillsNameCool", abrev: "SWFFG.SkillsNameCool" },
+  "Coordination": { value: "Coordination", label: "SWFFG.SkillsNameCoordination", abrev: "SWFFG.SkillsNameCoordination" },
+  "Deception": { value: "Deception", label: "SWFFG.SkillsNameDeception", abrev: "SWFFG.SkillsNameDeception" },
+  "Discipline": { value: "Discipline", label: "SWFFG.SkillsNameDiscipline", abrev: "SWFFG.SkillsNameDiscipline" },
+  "Gunnery": { value: "Gunnery", label: "SWFFG.SkillsNameGunnery", abrev: "SWFFG.SkillsNameGunneryAbbreviation" },
+  "Knowledge: Core Worlds": { value: "Knowledge: Core Worlds", label: "SWFFG.SkillsNameKnowledgeCoreWorlds", abrev: "SWFFG.SkillsNameKnowledgeCoreWorldsStripped" },
+  "Knowledge: Education": { value: "Knowledge: Education", label: "SWFFG.SkillsNameKnowledgeEducation", abrev: "SWFFG.SkillsNameKnowledgeEducationStripped" },
+  "Knowledge: Lore": { value: "Knowledge: Lore", label: "SWFFG.SkillsNameKnowledgeLore", abrev: "SWFFG.SkillsNameKnowledgeLoreStripped" },
+  "Knowledge: Outer Rim": { value: "Knowledge: Outer Rim", label: "SWFFG.SkillsNameKnowledgeOuterRim", abrev: "SWFFG.SkillsNameKnowledgeOuterRimStripped" },
+  "Knowledge: Underworld": { value: "Knowledge: Underworld", label: "SWFFG.SkillsNameKnowledgeUnderworld", abrev: "SWFFG.SkillsNameKnowledgeUnderworldStripped" },
+  "Knowledge: Warfare": { value: "Knowledge: Warfare", label: "SWFFG.SkillsNameKnowledgeWarfare", abrev: "SWFFG.SkillsNameKnowledgeWarfareStripped" },
+  "Knowledge: Xenology": { value: "Knowledge: Xenology", label: "SWFFG.SkillsNameKnowledgeXenology", abrev: "SWFFG.SkillsNameKnowledgeXenologyStripped" },
+  "Leadership": { value: "Leadership", label: "SWFFG.SkillsNameLeadership", abrev: "SWFFG.SkillsNameLeadership" },
+  "Lightsaber": { value: "Lightsaber", label: "SWFFG.SkillsNameLightsaber", abrev: "SWFFG.SkillsNameLightsaberAbbreviation" },
+  "Mechanics": { value: "Mechanics", label: "SWFFG.SkillsNameMechanics", abrev: "SWFFG.SkillsNameMechanics" },
+  "Medicine": { value: "Medicine", label: "SWFFG.SkillsNameMedicine", abrev: "SWFFG.SkillsNameMedicine" },
+  "Melee": { value: "Melee", label: "SWFFG.SkillsNameMelee", abrev: "SWFFG.SkillsNameMeleeAbbreviation" },
+  "Negotiation": { value: "Negotiation", label: "SWFFG.SkillsNameNegotiation", abrev: "SWFFG.SkillsNameNegotiation" },
+  "Perception": { value: "Perception", label: "SWFFG.SkillsNamePerception", abrev: "SWFFG.SkillsNamePerception" },
+  "Piloting: Planetary": { value: "Piloting: Planetary", label: "SWFFG.SkillsNamePilotingPlanetary", abrev: "SWFFG.SkillsNamePilotingPlanetary" },
+  "Piloting: Space": { value: "Piloting: Space", label: "SWFFG.SkillsNamePilotingSpace", abrev: "SWFFG.SkillsNamePilotingSpace" },
+  "Ranged: Heavy": { value: "Ranged: Heavy", label: "SWFFG.SkillsNameRangedHeavy", abrev: "SWFFG.SkillsNameRangedHeavyAbbreviation" },
+  "Ranged: Light": { value: "Ranged: Light", label: "SWFFG.SkillsNameRangedLight", abrev: "SWFFG.SkillsNameRangedLightAbbreviation" },
+  "Resilience": { value: "Resilience", label: "SWFFG.SkillsNameResilience", abrev: "SWFFG.SkillsNameResilience" },
+  "Skulduggery": { value: "Skulduggery", label: "SWFFG.SkillsNameSkulduggery", abrev: "SWFFG.SkillsNameSkulduggery" },
+  "Stealth": { value: "Stealth", label: "SWFFG.SkillsNameStealth", abrev: "SWFFG.SkillsNameStealth" },
+  "Streetwise": { value: "Streetwise", label: "SWFFG.SkillsNameStreetwise", abrev: "SWFFG.SkillsNameStreetwise" },
+  "Survival": { value: "Survival", label: "SWFFG.SkillsNameSurvival", abrev: "SWFFG.SkillsNameSurvival" },
+  "Vigilance": { value: "Vigilance", label: "SWFFG.SkillsNameVigilance", abrev: "SWFFG.SkillsNameVigilance" },
 };
 
 FFG.skills_knowledgestripped = {
@@ -299,18 +299,34 @@ FFG.mod_types = {
     "value": "Characteristic",
     "label": "SWFFG.ModTypeCharacteristic",
   },
-  "Skill Rank": {
-    "value": "Skill Rank",
-    "label": "SWFFG.ModTypeSkillRank",
+  "Career Skill": {
+    "value": "Career Skill",
+    "label": "SWFFG.ModTypeCareerSkill",
+  },
+  "Force Boost": {
+    "value": "Force Boost",
+    "label": "SWFFG.ModTypeSkillForceBoost",
   },
   "Skill Boost": {
     "value": "Skill Boost",
     "label": "SWFFG.ModTypeSkillBoost",
   },
+  "Skill Rank": {
+    "value": "Skill Rank",
+    "label": "SWFFG.ModTypeSkillRank",
+  },
+  "Skill Remove Setback": {
+    "value": "Skill Remove Setback",
+    "label": "SWFFG.ModTypeSkillRemoveSetback",
+  },
+  "Skill Setback": {
+    "value": "Skill Setback",
+    "label": "SWFFG.ModTypeSkillSetback",
+  },
   "Stat": {
     "value": "Stat",
     "label": "SWFFG.ModTypeStat",
-  }
+  },
 };
 
 FFG.weapon_mod_types = {
@@ -326,6 +342,18 @@ FFG.weapon_mod_types = {
     "value": "Skill Boost",
     "label": "SWFFG.ModTypeSkillBoost",
   },
+  "Career Skill": {
+    "value": "Career Skill",
+    "label": "SWFFG.ModTypeCareerSkill",
+  },
+  "Skill Remove Setback": {
+    "value": "Skill Remove Setback",
+    "label": "SWFFG.ModTypeSkillSetback",
+  },
+  "Skill Setback": {
+    "value": "Skill Setback",
+    "label": "SWFFG.ModTypeSkillRemoveSetback",
+  },
   "Stat": {
     "value": "Stat",
     "label": "SWFFG.ModTypeStat",
@@ -333,8 +361,8 @@ FFG.weapon_mod_types = {
   "Weapon Stat": {
     "value": "Weapon Stat",
     "label": "SWFFG.ModTypeStatWeapon",
-  }
-}
+  },
+};
 
 FFG.species = {};
 
@@ -371,15 +399,26 @@ FFG.difficulty = {
 
 FFG.vehicle_consumable_range = {
   "days": {
-    value: 0,
+    value: "days",
     label: "SWFFG.Days",
   },
   "months": {
-    value: 0,
+    value: "months",
     label: "SWFFG.Months",
   },
   "years": {
-    value: 0,
+    value: "years",
     label: "SWFFG.Years",
-  }
-}
+  },
+};
+
+FFG.diceresults = {
+  success: "Successes",
+  failure: "Failures",
+  advantage: "Advantages",
+  threat: "Threats",
+  triumph: "Triumphs",
+  despair: "Despairs",
+  light: "Force",
+  dark: "Dark Force",
+};

@@ -1,0 +1,45 @@
+<div class="starwarsffg dice-roll">
+  <div class="dice-result">
+    {{#if hasStandard}}
+    <div class="dice-formula">{{formula}}</div>
+    {{/if}} {{#if hasFFG}} {{#if data._id}}
+    <div class="item-display">
+      <img class="item-image" src="{{data.img}}" />
+      <h2 class="item-name">{{data.name}}</h2>
+      {{#if ffg.success}}
+      <h4 class="item-damage">Damage: <input class="damage-value" type="text" value="{{data.data.damage.value}} + {{ffg.success}} = {{math data.data.damage.value '+' ffg.success}}" disabled /></h4>
+      <h4 class="item-critical">Critical: <input class="damage-value" type="text" value="{{data.data.crit.value}}" disabled /></h4>
+      {{else}}
+      <h4 class="item-miss">Miss!</h4>
+      {{/if}} {{#if data.data.special.value}}
+      <div class="specials">
+        <h5>
+          Special Qualities:
+          <div class="damage-value">{{{data.data.special.value}}}</div>
+        </h5>
+      </div>
+      {{/if}}
+    </div>
+    {{/if}}
+    <div class="ffgDiceArray">
+      <ol class="dice-rolls">
+        {{#each ffgDice}} {{#if this.isFFG}}{{#each this.rolls}}
+        <li class="roll">{{{this.result}}}</li>
+        {{/each}} {{/if}} {{/each}}
+      </ol>
+    </div>
+    {{/if}} {{{tooltip}}} {{#if hasStandard}}
+    <h4 class="dice-total">{{total}}</h4>
+    {{/if}} {{#if hasFFG}}
+    <ul>
+      {{#if ffg.success}}
+      <li class="roll-success">Check succeeded!</li>
+      {{else}}
+      <li class="roll-failure">Check failed!</li>
+      {{/if}} {{#each ffg as | result key|}} {{#if this}}
+      <li>{{lookup ../this.diceresults [key]}}: {{this}}</li>
+      {{/if}} {{/each}}
+    </ul>
+    {{/if}}
+  </div>
+</div>
